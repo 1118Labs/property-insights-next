@@ -1,30 +1,27 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const authBase = process.env.JOBBER_AUTH_URL;
-  const clientId = process.env.JOBBER_CLIENT_ID;
-  const redirectUri = process.env.JOBBER_REDIRECT_URI;
+  const base = process.env.JOBBER_AUTH_URL;
 
-  if (!authBase || !clientId || !redirectUri) {
+  if (!base) {
     return NextResponse.json(
       {
         error: "Missing Jobber OAuth env vars",
         details: {
-          JOBBER_AUTH_URL: !!authBase,
-          JOBBER_CLIENT_ID: !!clientId,
-          JOBBER_REDIRECT_URI: !!redirectUri,
+          JOBBER_AUTH_URL: !!process.env.JOBBER_AUTH_URL,
+          JOBBER_CLIENT_ID: !!process.env.JOBBER_CLIENT_ID,
+          JOBBER_REDIRECT_URI: !!process.env.JOBBER_REDIRECT_URI,
         },
       },
       { status: 500 }
     );
   }
 
-  const url = new URL(authBase);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "offline_access");
-  url.searchParams.set("state", "propertyInsightsConnect");
+  const authUrl = new URL(base);
+  authUrl.searchParams.set("client_id", process.env.JOBBER_CLIENT_ID!);
+  authUrl.searchParams.set("redirect_uri", process.env.JOBBER_REDIRECT_URI!);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", "read write");
 
-  return NextResponse.redirect(url.toString());
+  return NextResponse.redirect(authUrl.toString());
 }

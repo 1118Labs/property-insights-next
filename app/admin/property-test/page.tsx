@@ -1,32 +1,157 @@
-"use client";
+// app/admin/property-test/page.tsx
+'use client';
 
-export default function Home() {
-  const handleConnect = () => {
-    // This will redirect to our authorize route, which then sends you to Jobber
-    window.location.href = "/api/jobber/authorize";
+import { useState } from 'react';
+
+type RequestSummary = {
+  id: string;
+  title?: string;
+  status?: string;
+  createdAt?: string;
+  clientName?: string;
+  addressLine1?: string;
+  city?: string;
+};
+
+export default function PropertyTestPage() {
+  const [loading, setLoading] = useState(false);
+  const [requests, setRequests] = useState<RequestSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConnectJobber = () => {
+    // This hits our /api/jobber/authorize route
+    window.location.href = '/api/jobber/authorize';
+  };
+
+  const handleFetchRequests = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/jobber/requests');
+
+      const body = await res.json().catch(() => ({} as any));
+
+      if (!res.ok) {
+        throw new Error(body?.error || `Request failed with status ${res.status}`);
+      }
+
+      // Map the GraphQL result into a simple array
+      const edges = body?.data?.requests?.edges ?? [];
+      const summaries: RequestSummary[] = edges.map((edge: any) => {
+        const node = edge?.node ?? {};
+        const client = node.client ?? {};
+        const property = node.property ?? {};
+        const addr = property.address ?? {};
+
+        const clientName = [client.firstName, client.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
+        return {
+          id: node.id,
+          title: node.title,
+          status: node.status,
+          createdAt: node.createdAt,
+          clientName: clientName || undefined,
+          addressLine1: addr.line1,
+          city: addr.city,
+        };
+      });
+
+      setRequests(summaries);
+    } catch (err: any) {
+      console.error('Error fetching Jobber requests:', err);
+      setError(err.message || 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-lg w-full p-8 bg-white rounded-xl shadow">
-        <h1 className="text-3xl font-bold mb-4">Property Insights – Jobber Connect</h1>
-        <p className="mb-6 text-gray-700">
-          Click the button below to connect your Jobber account. You’ll be taken to
-          Jobber to approve access, then redirected back here and we’ll exchange the
-          authorization code for access tokens.
-        </p>
+    <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="w-full max-w-3xl bg-white shadow-lg rounded-2xl p-8 space-y-8 border border-slate-100">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Property Insights — Dev Shell
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
+            This page is wired to the live Netlify + Jobber OAuth flow.
+            Use it to test pulling recent <strong>Jobber Requests</strong>.
+          </p>
+        </div>
 
-        <button
-          onClick={handleConnect}
-          className="px-6 py-3 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
-        >
-          Connect Jobber
-        </button>
+        <div className="flex flex-wrap gap-4">
+          <button
+            type="button"
+            onClick={handleConnectJobber}
+            className="inline-flex items-center justify-center rounded-lg border border-emerald-500 bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition"
+          >
+            Connect Jobber
+          </button>
 
-        <p className="mt-4 text-sm text-gray-500">
-          Once connected, we’ll be able to pull client addresses from Jobber and run
-          property insights lookups.
-        </p>
+          <button
+            type="button"
+            onClick={handleFetchRequests}
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition"
+          >
+            {loading ? 'Loading Requests…' : 'Fetch Jobber Requests'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+
+        {requests.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Recent Jobber Requests
+            </h2>
+            <ul className="space-y-2 max-h-80 overflow-auto">
+              {requests.map((r) => (
+                <li
+                  key={r.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-slate-900">
+                      {r.title || 'Untitled Request'}
+                    </span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                      {r.status || 'UNKNOWN'}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-slate-700">
+                    {r.clientName && <span>{r.clientName}</span>}
+                    {r.clientName && (r.addressLine1 || r.city) && <span> • </span>}
+                    {(r.addressLine1 || r.city) && (
+                      <span>
+                        {[r.addressLine1, r.city].filter(Boolean).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  {r.createdAt && (
+                    <div className="mt-1 text-xs text-slate-500">
+                      Created at: {new Date(r.createdAt).toLocaleString()}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {requests.length === 0 && !error && (
+          <p className="text-xs text-slate-500">
+            No requests loaded yet. Click <strong>Fetch Jobber Requests</strong> after
+            connecting Jobber.
+          </p>
+        )}
       </div>
     </main>
   );
