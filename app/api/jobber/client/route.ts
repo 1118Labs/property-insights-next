@@ -1,54 +1,39 @@
 import { NextResponse } from "next/server";
+import { fetchJobberClient, ensureJobberAccessToken } from "@/lib/jobber";
+import { supabaseEnabled } from "@/lib/supabase/server";
+import { isNonEmptyString } from "@/lib/utils/validation";
+import { createCorrelationId, jsonError, rateLimitGuard } from "@/lib/utils/api";
+import { assertAdminAuthorized } from "@/lib/utils/auth";
+import { assertNotSafeMode } from "@/lib/config";
 
 export async function POST(req: Request) {
+  const correlationId = createCorrelationId();
+  if (!rateLimitGuard("api:jobber-client", 20, 60_000)) {
+    return jsonError(429, { errorCode: "RATE_LIMIT", message: "Too many requests", correlationId });
+  }
+  try {
+    assertAdminAuthorized(req);
+  } catch (err) {
+    const status = (err as { status?: number } | undefined)?.status ?? 401;
+    return jsonError(status, { errorCode: "UNAUTHORIZED", message: "Admin secret required", correlationId });
+  }
   try {
     const { clientId } = await req.json();
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "Missing clientId in request body" },
-        { status: 400 }
-      );
+    if (!isNonEmptyString(clientId)) {
+      return jsonError(400, { errorCode: "INVALID_INPUT", message: "Missing or invalid clientId", correlationId });
     }
 
-    const accessToken = process.env.JOBBER_ACCESS_TOKEN;
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "Missing JOBBER_ACCESS_TOKEN in env vars" },
-        { status: 500 }
-      );
+    if (!supabaseEnabled) {
+      return jsonError(400, { errorCode: "SUPABASE_DISABLED", message: "Supabase not configured; Jobber tokens unavailable.", correlationId });
     }
 
-    const res = await fetch(
-      `https://api.getjobber.com/api/clients/${clientId}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      return NextResponse.json(
-        {
-          error: "Jobber returned an error",
-          status: res.status,
-          details: data,
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(data);
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: "Exception during Jobber client fetch", details: err.message },
-      { status: 500 }
-    );
+    assertNotSafeMode();
+    const tokenResult = await ensureJobberAccessToken();
+    const data = await fetchJobberClient(tokenResult.accessToken, clientId.trim());
+    return NextResponse.json({ ...data, tokenStatus: tokenResult.tokenStatus, correlationId }, { headers: { "x-correlation-id": correlationId } });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return jsonError(500, { errorCode: "SERVER_ERROR", message: "Exception during Jobber client fetch", details: detail, correlationId });
   }
 }

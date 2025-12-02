@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Property Insights MVP
 
-## Getting Started
+End-to-end MVP for Property Insights: ingest Jobber requests, persist them in Supabase, auto-generate property insights, and surface dashboards for operations.
 
-First, run the development server:
+## Stack
+- Next.js App Router + TypeScript + Tailwind
+- Supabase (clients, properties, service_requests, jobber_tokens, property_insights)
+- Jobber OAuth + GraphQL
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Run locally
+1) Install deps: `npm install`
+2) Configure env (create `.env.local`):
 ```
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+JOBBER_AUTH_URL=https://api.getjobber.com/api/oauth/authorize
+JOBBER_CLIENT_ID=...
+JOBBER_CLIENT_SECRET=...
+JOBBER_REDIRECT_URI=http://localhost:3000/api/jobber/callback
+```
+3) Apply schema to Supabase: `psql $SUPABASE_URL < supabase/schema.sql` (ensure `pgcrypto` enabled)
+4) Dev server: `npm run dev`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key flows
+- **Jobber OAuth**: `/api/jobber/authorize` → `/api/jobber/callback` stores tokens in `jobber_tokens`.
+- **Token refresh**: POST `/api/jobber/refresh`.
+- **Ingestion**: POST `/api/jobber/ingest` fetches latest requests via GraphQL and upserts clients, properties, and service_requests.
+- **Insights**: POST `/api/property-insights` runs heuristic scoring and optionally persists the property.
+- **Portfolio**: GET `/api/properties` lists stored properties + summary, GET `/api/properties/[id]` fetches one.
+- **Status**: GET `/api/status` shows env/token readiness.
+- **Health + diagnostics**: GET `/api/health` (supabase/jobber/providers), GET `/api/provider-health` for in-memory metrics.
+- **Platforms**: `/api/platform-config` to view/set active platform (Jobber/ServiceTitan/Housecall Pro), `/api/platform-health` for per-platform status, `/api/ingest` for platform-agnostic ingest. Default remains Jobber.
+- **Exports**: GET `/api/export/properties.csv`, GET `/api/export/insights.csv` (mocked when Supabase disabled).
+- **Admin downloads**: CSV exports surfaced in Admin dashboard; insight export includes provenance/meta for diagnostics.
+- **Ingestion events**: GET `/api/ingestion-events?source=&status=&q=&limit=&offset=` supports filtering + pagination for the admin log viewer.
+- **Safety**: Optional `ADMIN_SHARED_SECRET` header guard on admin APIs; `SAFE_MODE=true` disables ingestion/rebuild actions and surfaces UI banner.
+- **Modes**: `NEXT_PUBLIC_DEMO_MODE=true` labels demo/sample data and disables risky actions; `ANALYTICS_ENABLED=true` enables in-app, in-memory event logging only.
+- **Exports**: Insights provenance CSV at `/api/export/insights-provenance.csv`.
+- **Health/system**: `/api/system-health` for provider metrics; admin status page for uptime/failures (placeholder).
+- **Ask Insight**: `/api/ask-insight?q=` synthesizes narratives/trends; enriched profiles include confidence, quality index, taxonomy, trends.
+- **Aerial intelligence (beta)**: `/api/analyze-aerial` performs geocode → tile fetch → segmentation; enrichment attaches `aerialInsights` (provider, yard/roof/driveway sqft, pool detection) and feeds service-specific modules.
+- **Exports**: ingestion events CSV and insights provenance CSV; batch dry-run available via `/api/cron/run` with `task: "property-insights-batch"`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## UI map
+- `/` — Marketing + quick address lookup, live insight preview
+- `/properties` — Portfolio dashboard with scores and risk flags
+- `/properties/[id]` — Detail view with provenance, risk drilldown, history, map/photo placeholders
+- `/admin` — Integration health + ingestion controls
+- `/admin/property-test` — Raw Jobber request tester
+- `/admin/ingestion-log` — Ingestion event filters + manual ingest modal
+- `/admin/providers` — Provider diagnostics & circuit indicators
+- `/admin/health` — Health banner, webhook simulator, address normalization helper
+- `/docs/GETTING_STARTED.md` — Quick start for connecting, checking health, and running first ingest
+- `/docs/KNOWN_LIMITATIONS.md` — Provider caveats and data notes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Admin + diagnostics components (opt-in)
+- `HealthStatusBanner` — summarize API health (supabase/jobber/provider counts).
+- `JobberConnectionMonitor` — token expiry countdown + failure counter.
+- `ProviderDiagnosticsDashboard` — in-memory provider uptime/error/latency (pulls `/api/health`).
+- `IngestionEventsList` — filterable/paginated ingestion events.
+- `ManualIngestModal` / `RebuildInsightsModal` — safe, manual triggers for ingestion/rebuild (no scheduling).
+- `PropertyProvenancePanel` / `PropertyHistoryPanel` / `RiskFactorBreakdown` — provenance + scoring details.
+- `CircuitBreakerIndicator`, `WebhookSimulator`, `AddressNormalizePreview`, `StaticMapPreview`, `PhotoPlaceholder` — lightweight utility widgets for admin/debug surfaces.
+- `FeedbackModal`, session recap, helper/tooltips, and “What am I looking at?” explainer to make demos clear and trustworthy.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- When Supabase env vars are missing, the app falls back to mock data for insights but Jobber flows require Supabase for token storage.
+- Scoring uses heuristic breakdown (livability, efficiency, market strength, risk) and generates valuations/rent estimates.

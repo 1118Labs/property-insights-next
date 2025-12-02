@@ -1,0 +1,50 @@
+# Overnight Progress Log – Property Insights
+
+- Initialized overnight run with enrichment, scoring, and Jobber hardening plan (time: now).
+- Hardened enrichment (validation, retries, safe address handling), scoring weights/risks, Jobber ingestion logging, and added unit tests via Vitest (lint/tests passing).
+- Added ingestion logging helper, token staleness flagging, Jobber edge validation, cron stub, component skeletons, enrichment/scoring refinements, and expanded unit tests (scoring/enrichment/jobber). All lint/tests passing.
+- Enhanced Jobber ingest response with token staleness flag; added ingestion logging helper and cron stub.
+- Tightened scoring tests (newer vs older properties), maintained safe schema note on updated_at columns.
+- Created supervisor roadmap, QA notes, architecture/module/API/workflow docs, changelog, release guide, and cross-system notes. Lint/tests remain green (8/8 unit tests).
+- Added utility tests for validation and retry helpers; test suite now 12 passing.
+- Implemented token auto-refresh helper `ensureJobberAccessToken` with stale detection fix; routes now report tokenStatus using refreshed tokens when available.
+- Added unit test for token refresh logic and fixed stale detection for zero expiry.
+- Added enrichment ingestion logging and enrich API tests; tests now 15/15. Lint clean after removing unused variables.
+- Swapped Jobber client route to use token auto-refresh helper and input validation.
+- Added token helper coverage for stale-no-refresh and refresh failures; tests now 17/17.
+- Added dry-run support to /api/jobber/ingest and a handler test mocking Jobber/Supabase dependencies; test suite now 18/18.
+- Improved token helper to accept injected getLatest, aiding testability; safeguarded refresh logic and ensured lint/tests remain clean.
+- Added enrichment meta timing; lint/tests still green.
+- Minor cleanup around Jobber env response path; lint/tests remain green.
+- Added mocked properties API tests for list and missing-id behavior; resolved module mocking init issue. Tests now 20/20.
+- Scoring updates: scoreVersion injected, new risk flag for missing geo, improved typed context; tests expanded (21/21 passing).
+- Expanded scoring breakdown with lotAppeal, ageFactor, and equityDelta signals; kept scoreVersion; tests updated (22/22).
+- Enrichment now records providerErrors per provider and only merges on successful results; error isolation improved. Tests/lint remain green.
+- Strengthened provider result typing (nullable fields) and cleaned merge defaults; enrichment retains provider error isolation. Lint/tests still green (22/22).
+- Added Zod schemas for address inputs; enforced validation in /api/enrich and /api/property-insights, and dry-run parsing in Jobber ingest. Added zod dependency. Tests/lint remain green (22/22).
+- Normalized API responses: /api/enrich now returns property/sources/warnings/meta under data; /api/properties wraps items+summary. Tests/lint still green (22/22).
+- Added in-memory TTL cache for enrichment to speed repeat lookups (test-mode friendly); added cache-clearing tests. All lint/tests green (23/23).
+- Added background ingestion scaffold `jobberIngestionTask` with dry-run option and ingestion logging. Tests/lint still green (23/23).
+- Added provider error normalization map for enrichment; errors now standardized per provider. Lint/tests remain green (23/23).
+- Added Jobber schema validator for request nodes/addresses/clients before mapping; integrated into ingestion mapping. Lint/tests remain green (23/23).
+- Added address normalization/formatting utils; integrated into Jobber mapping. Lint/tests remain green (23/23).
+- Added telemetry counters for enrichment runs/errors and jobber ingestion attempts/errors; kept lint/tests green (23/23).
+- Added provider error normalization and geocode stub; integrated telemetry counters and address normalization. Lint/tests remain green (23/23).
+- Added API normalization tests with mocks for enrich and properties; suite now 25/25 passing after dependency mocks.
+- Added smoke test for ingestion→enrichment→scoring chain; suite now 26/26 passing, lint clean.
+- Added documentation comments to provider adapters; lint/tests remain green (26/26).
+- Health endpoint now returns provider diagnostics + jobber counters; provider error map expanded; circuit state surfaced.
+- Added CSV export endpoints for properties and insights (mock-safe); ingestion-events API returns count for pagination.
+- New admin widgets: health banner, provider dashboard, connection monitor, circuit indicator, ingestion/rebuild modals, webhook simulator, address/map/photo placeholders, provenance/history panels, risk breakdown.
+- Enrichment now supports provider allowlists, retry with circuit hints, cache flagging, and provenance meta (durations/fallback/cache/circuit).
+- Added component + export API tests and dark-mode polish for new widgets; test suite now 36/36 passing.
+- Phase 4 unlocked: admin layout/nav with global health banner + theme toggle; new admin providers/health/ingestion views with diagnostics, simulators, and manual ingest/rebuild modals.
+- Property detail route `/properties/[id]` with provenance/history/risk drilldown, map/photo placeholders, and export links; property list links into detail.
+- Health API expanded with status codes, expiry days, circuit info; provider dashboards show circuit indicators; CSV export endpoints surfaced in UI.
+- Aerial intelligence wired into enrichment: geocode → tile fetch (Apple/OSM/ESRI/NAIP fallback) → segmentation heuristics with TTL caching and provider metrics; `aerialInsights` now attached to property insights and service-specific modules; new `/api/analyze-aerial` uses shared runner. Added geocode caching, aerial vitest coverage, removed obsolete snapshots; full test suite now 66/66 passing.
+- Omega Build 4: multi-platform ingest abstraction (platform enum/types, resolver, adapters for Jobber/ServiceTitan/HCP, platform-aware ingestion API `/api/ingest`, platform health endpoint, admin platform selector, platform-aware ingestion events + filters). Added webhook stubs for ST/HCP, platform sanity dashboard, and docs/PLATFORMS.md. Tests 75/75, lint/build passing.
+- Omega Build 5: Quote & Job Estimation engine with pricing profiles (overrides via env/API), quote builder + caching, in-memory store/versioning/audit, APIs for build/save/get/export/recalculate/compare/estimate, HTML export, recommended upsells, complexity/urgency multipliers, admin quick estimate + property quote generator UI, quote docs. Tests 82/82, lint/build clean.
+- Omega Build 6: AI scheduling + routing (job slots, routes, simulator, ICS export, scheduling config/metrics, UI scaffolds, tests).
+- Omega Build 7: Client portal with passwordless tokens, invite/verify/approve APIs, portal pages for insights/quotes, simplified client components, activity tracking, middleware token handling, and docs (`docs/CLIENT_PORTAL.md`). Tests 86/86, lint/build clean.
+- Omega Build 8: Notifications/webhooks/CRM stubs; notification config endpoint, webhook test endpoint, CRM status checks, portal approval + job slot notifications, admin placeholders, docs (`docs/NOTIFICATIONS.md`). Tests 88/88, lint/build clean.
+- Omega Build 9: Production hardening with cache TTL config, notification rate limits, retry helper, cleanup stubs, security headers, deployment guide, build verification script, env validation stub, and health/status enrichments. Tests 88/88, build passing.

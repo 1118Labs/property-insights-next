@@ -1,106 +1,47 @@
-// app/api/jobber/requests/route.ts
-
-import "@/lib/supabase/server";               // ⬅️ NEW — forces server.ts to execute
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { fetchRecentJobberRequests, ingestJobberRequests, ensureJobberAccessToken } from "@/lib/jobber";
+import { supabaseEnabled } from "@/lib/supabase/server";
+import { createCorrelationId, jsonError, rateLimitGuard } from "@/lib/utils/api";
+import { assertAdminAuthorized } from "@/lib/utils/auth";
+import { assertNotSafeMode } from "@/lib/config";
 
-const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
-
-// Recent Jobber Requests query (GraphQL)
-const RECENT_REQUESTS_QUERY = `
-  query RecentRequests($first: Int!) {
-    requests(first: $first, orderBy: { field: CREATED_AT, direction: DESC }) {
-      edges {
-        node {
-          id
-          title
-          status
-          createdAt
-          client {
-            id
-            firstName
-            lastName
-          }
-          property {
-            id
-            address {
-              line1
-              line2
-              city
-              province
-              postalCode
-              country
-            }
-          }
-        }
-      }
-    }
+export async function GET(req: Request) {
+  const correlationId = createCorrelationId();
+  if (!rateLimitGuard("api:jobber-requests", 10, 60_000)) {
+    return jsonError(429, { errorCode: "RATE_LIMIT", message: "Too many requests", correlationId });
   }
-`;
-
-export async function GET() {
   try {
-    // 1) Read latest Jobber tokens from Supabase
-    const { data: tokenRow, error: tokenError } = await supabaseAdmin
-      .from("jobber_tokens")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (tokenError) {
-      console.error("Error reading jobber_tokens:", tokenError);
-      return NextResponse.json(
-        { error: "Failed to read Jobber tokens" },
-        { status: 500 }
-      );
+    assertAdminAuthorized(req);
+  } catch (err) {
+    const status = (err as { status?: number } | undefined)?.status ?? 401;
+    return jsonError(status, { errorCode: "UNAUTHORIZED", message: "Admin secret required", correlationId });
+  }
+  try {
+    if (!supabaseEnabled) {
+      return jsonError(400, { errorCode: "SUPABASE_DISABLED", message: "Supabase not configured; Jobber tokens unavailable.", correlationId });
     }
 
-    if (!tokenRow?.access_token) {
-      return NextResponse.json(
-        {
-          error: "No Jobber tokens found. Please connect Jobber first.",
-        },
-        { status: 401 }
-      );
-    }
-
-    const accessToken = tokenRow.access_token as string;
-
-    // 2) Build GraphQL request
-    const graphqlBody = {
-      query: RECENT_REQUESTS_QUERY,
-      variables: { first: 10 },
+    assertNotSafeMode();
+    const tokenResult = await ensureJobberAccessToken();
+    const edges = await fetchRecentJobberRequests(tokenResult.accessToken);
+    const payload: { edges: unknown; ingest?: unknown; tokenStatus?: string } = {
+      edges,
+      tokenStatus: tokenResult.tokenStatus,
     };
 
-    const jobberRes = await fetch(JOBBER_GRAPHQL_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(graphqlBody),
-    });
-
-    const text = await jobberRes.text();
-
-    if (!jobberRes.ok) {
-      console.error("Jobber GraphQL error:", text);
-      return NextResponse.json(
-        { error: "Jobber GraphQL request failed", details: text },
-        { status: 502 }
-      );
+    if (supabaseEnabled) {
+      try {
+        const ingestResult = await ingestJobberRequests(edges);
+        payload.ingest = ingestResult;
+      } catch (err) {
+        console.error("Ingestion error", err);
+        payload.ingest = { error: String(err) };
+      }
     }
 
-    const json = JSON.parse(text);
-
-    // 3) Return the Jobber data
-    return NextResponse.json(json);
+    return NextResponse.json({ data: { requests: { edges } }, ...payload, correlationId });
   } catch (err) {
-    console.error("Unexpected error in /api/jobber/requests:", err);
-    return NextResponse.json(
-      { error: "Unexpected server error", details: String(err) },
-      { status: 500 }
-    );
+    console.error("Unexpected error in /api/jobber/requests:", err, { correlationId });
+    return jsonError(500, { errorCode: "SERVER_ERROR", message: "Unexpected server error", details: String(err), correlationId });
   }
 }

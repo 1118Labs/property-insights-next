@@ -1,0 +1,95 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot core components > matches snapshot for health banner 1`] = `
+<div>
+  <div
+    class="rounded-xl border px-4 py-2 text-sm font-semibold border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-100"
+  >
+    <div
+      class="flex flex-wrap items-center gap-2"
+    >
+      <span>
+        Health: 
+        ok
+      </span>
+      <span
+        class="rounded-full bg-white/60 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-100"
+      >
+        Supabase: ok
+      </span>
+      <span
+        class="rounded-full bg-white/60 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-100"
+      >
+        Jobber: fresh
+      </span>
+      <span
+        class="rounded-full bg-white/60 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-100"
+      >
+        Providers: 2
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`snapshot core components > matches snapshot for risk pills 1`] = `
+<div>
+  <div
+    class="flex flex-wrap gap-2"
+  >
+    <span
+      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+    >
+      <span
+        aria-hidden="true"
+        class="h-2 w-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-400"
+      />
+      Zoning risk
+    </span>
+    <span
+      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+    >
+      <span
+        aria-hidden="true"
+        class="h-2 w-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-400"
+      />
+      Pricing risk
+    </span>
+    <span
+      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+    >
+      <span
+        aria-hidden="true"
+        class="h-2 w-2 rounded-full bg-gradient-to-r from-rose-500 to-rose-400"
+      />
+      Permit risk
+    </span>
+    <span
+      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+    >
+      <span
+        aria-hidden="true"
+        class="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+      />
+      Comp mismatch
+    </span>
+  </div>
+</div>
+`;
+
+exports[`snapshot core components > matches snapshot for score badge 1`] = `
+<div>
+  <div
+    class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold shadow-sm bg-emerald-100 text-emerald-800 border-emerald-200"
+  >
+    <span
+      class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/70 text-xs font-bold text-slate-900"
+    >
+      82
+    </span>
+    <span>
+      Score
+    </span>
+  </div>
+</div>
+`;

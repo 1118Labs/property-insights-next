@@ -13,6 +13,17 @@ type RequestSummary = {
   city?: string;
 };
 
+type JobberRequestEdge = {
+  node: {
+    id: string;
+    title?: string;
+    status?: string;
+    createdAt?: string;
+    client?: { firstName?: string; lastName?: string };
+    property?: { address?: { line1?: string; city?: string } };
+  };
+};
+
 export default function PropertyTestPage() {
   const [loading, setLoading] = useState(false);
   const [requests, setRequests] = useState<RequestSummary[]>([]);
@@ -30,40 +41,38 @@ export default function PropertyTestPage() {
     try {
       const res = await fetch('/api/jobber/requests');
 
-      const body = await res.json().catch(() => ({} as any));
+      const body = (await res.json().catch(() => ({}))) as {
+        data?: { requests?: { edges?: JobberRequestEdge[] } };
+        error?: string;
+      };
 
       if (!res.ok) {
         throw new Error(body?.error || `Request failed with status ${res.status}`);
       }
 
       // Map the GraphQL result into a simple array
-      const edges = body?.data?.requests?.edges ?? [];
-      const summaries: RequestSummary[] = edges.map((edge: any) => {
-        const node = edge?.node ?? {};
-        const client = node.client ?? {};
-        const property = node.property ?? {};
-        const addr = property.address ?? {};
-
-        const clientName = [client.firstName, client.lastName]
+      const edges: JobberRequestEdge[] = body?.data?.requests?.edges ?? [];
+      const summaries: RequestSummary[] = edges.map((edge) => {
+        const clientName = [edge.node.client?.firstName, edge.node.client?.lastName]
           .filter(Boolean)
           .join(' ')
           .trim();
 
         return {
-          id: node.id,
-          title: node.title,
-          status: node.status,
-          createdAt: node.createdAt,
+          id: edge.node.id,
+          title: edge.node.title || undefined,
+          status: edge.node.status || undefined,
+          createdAt: edge.node.createdAt || undefined,
           clientName: clientName || undefined,
-          addressLine1: addr.line1,
-          city: addr.city,
+          addressLine1: edge.node.property?.address?.line1,
+          city: edge.node.property?.address?.city,
         };
       });
 
       setRequests(summaries);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching Jobber requests:', err);
-      setError(err.message || 'Unknown error');
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }

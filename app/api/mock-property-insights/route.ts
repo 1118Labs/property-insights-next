@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { address, jobberClientId } = body;
+  const { address } = body;
 
   const mockData = {
     address: address || "123 Main St, Southold, NY",
