@@ -1,23 +1,31 @@
-// app/api/jobber/auth/route.ts
-
 import { NextResponse } from "next/server";
+import { buildJobberAuthUrl } from "@/lib/jobber";
+import { createCorrelationId } from "@/lib/utils/correlation";
 
-export async function GET() {
-  const clientId = process.env.JOBBER_CLIENT_ID;
-  const redirectUri = process.env.JOBBER_REDIRECT_URI;
-  const authUrl = process.env.JOBBER_AUTH_URL;
+export const runtime = "nodejs";
 
-  if (!clientId || !redirectUri || !authUrl) {
-    return NextResponse.json(
-      { error: "Missing Jobber OAuth environment variables" },
+// Shared handler so both /auth and /authorize call same logic
+export async function handleJobberAuth(request: Request) {
+  const origin = request.headers.get("origin") || undefined;
+  const correlationId = createCorrelationId();
+
+  try {
+    const redirect = buildJobberAuthUrl(origin);
+    return NextResponse.redirect(redirect);
+  } catch (err: any) {
+    console.error("Jobber auth error:", err);
+
+    return new NextResponse(
+      JSON.stringify({
+        error: "jobber_auth_failed",
+        message: err?.message,
+        correlationId,
+      }),
       { status: 500 }
     );
   }
+}
 
-  const url = new URL(authUrl);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-
-  return NextResponse.redirect(url.toString());
+export async function GET(request: Request) {
+  return handleJobberAuth(request);
 }
