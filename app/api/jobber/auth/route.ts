@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 // Shared handler so both /auth and /authorize call same logic
 export async function handleJobberAuth(request: Request) {
-  const origin = request.headers.get("origin") || undefined;
+  const origin = request.headers.get("origin") || new URL(request.url).origin;
   const correlationId = createCorrelationId();
 
   try {

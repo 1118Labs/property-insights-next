@@ -1,81 +1,38 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { exchangeCodeForTokens, resolveBaseUrl, storeJobberTokens } from "@/lib/jobber";
+import { supabaseEnabled } from "@/lib/supabase/server";
+import { createCorrelationId, jsonError } from "@/lib/utils/api";
 
-type JobberTokenResponse = {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-};
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const correlationId = createCorrelationId();
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
 
   if (error) {
-    return NextResponse.json({ error: "Jobber OAuth error", details: error }, { status: 400 });
+    return jsonError(400, { errorCode: "JOBBER_OAUTH_ERROR", message: "Jobber OAuth error", details: error, correlationId });
   }
+
   if (!code) {
-    return NextResponse.json({ error: "Missing authorization code" }, { status: 400 });
+    return jsonError(400, { errorCode: "MISSING_AUTH_CODE", message: "Missing authorization code", correlationId });
   }
 
-  const clientId = process.env.JOBBER_CLIENT_ID;
-  const clientSecret = process.env.JOBBER_CLIENT_SECRET;
-  const redirectUri = process.env.JOBBER_REDIRECT_URI;
-  const tokenUrl = process.env.JOBBER_TOKEN_URL;
-  if (!clientId || !clientSecret || !redirectUri || !tokenUrl) {
-    return NextResponse.json({ error: "Jobber OAuth env vars missing" }, { status: 500 });
+  if (!supabaseEnabled) {
+    return jsonError(500, { errorCode: "SUPABASE_DISABLED", message: "Supabase env vars missing; cannot store Jobber tokens", correlationId });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Supabase env vars missing" }, { status: 500 });
+  try {
+    const origin = url.origin;
+    const tokenResponse = await exchangeCodeForTokens(code, origin);
+    await storeJobberTokens(tokenResponse);
+
+    const base = resolveBaseUrl(origin) || origin;
+    return NextResponse.redirect(new URL("/connected", base));
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("Jobber OAuth callback error", err, { correlationId });
+    return jsonError(500, { errorCode: "JOBBER_CALLBACK_FAILURE", message: "Failed to complete Jobber OAuth", details: detail, correlationId });
   }
-
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const tokenRes = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basic}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    const text = await tokenRes.text();
-    return NextResponse.json({ error: "Failed to exchange code", details: text }, { status: 500 });
-  }
-
-  const tokenJson = (await tokenRes.json()) as JobberTokenResponse;
-  if (!tokenJson.access_token || !tokenJson.refresh_token) {
-    return NextResponse.json({ error: "Invalid token response" }, { status: 500 });
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-  const jobberAccountId = "default-account";
-  const expiresAt = new Date(Date.now() + (tokenJson.expires_in || 0) * 1000).toISOString();
-
-  const { error: upsertError } = await supabase.from("jobber_credentials").upsert(
-    {
-      jobber_account_id: jobberAccountId,
-      access_token: tokenJson.access_token,
-      refresh_token: tokenJson.refresh_token,
-      expires_at: expiresAt,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "jobber_account_id" }
-  );
-
-  if (upsertError) {
-    return NextResponse.json({ error: "Failed to store tokens", details: upsertError.message }, { status: 500 });
-  }
-
-  const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  return NextResponse.redirect(new URL("/connected", base));
 }

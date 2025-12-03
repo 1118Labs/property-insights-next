@@ -1,14 +1,75 @@
 import { NextResponse } from "next/server";
 import { requireAdminClient } from "./supabase/server";
 import { JobberTokenRow, ServiceRequestRecord, ClientRecord, PropertyRecord } from "./types";
-import { isJobberConfigured } from "./config";
 import { pickFirst } from "./utils/validation";
 import { logIngestionEvent } from "./utils/ingestion";
 import { validateJobberNode, JobberRequestNode } from "./jobber/validation";
 import { normalizeAddress } from "./utils/address";
 
 const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
-const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
+const DEFAULT_JOBBER_AUTH_URL = "https://api.getjobber.com/api/oauth/authorize";
+const JOBBER_TOKEN_URL = process.env.JOBBER_TOKEN_URL || "https://api.getjobber.com/api/oauth/token";
+
+export function resolveBaseUrl(origin?: string) {
+  const vercelUrl = process.env.VERCEL_URL
+    ? (process.env.VERCEL_URL.startsWith("http") ? process.env.VERCEL_URL : `https://${process.env.VERCEL_URL}`)
+    : undefined;
+  const candidates = [
+    origin,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.URL,
+    process.env.DEPLOY_PRIME_URL,
+    vercelUrl,
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(candidate);
+      return parsed.origin;
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
+export function resolveJobberRedirectUri(origin?: string) {
+  const base = resolveBaseUrl(origin);
+  const redirectEnv = process.env.JOBBER_REDIRECT_URI;
+  const redirectPath = redirectEnv && redirectEnv.startsWith("/") ? redirectEnv : redirectEnv || "/api/jobber/callback";
+
+  if (!base && !redirectEnv) {
+    throw new Error("JOBBER_REDIRECT_URI not provided and app base URL missing; set NEXT_PUBLIC_APP_URL (or URL/DEPLOY_PRIME_URL on Netlify).");
+  }
+
+  if (!base && redirectEnv && !redirectEnv.startsWith("http")) {
+    throw new Error("JOBBER_REDIRECT_URI must be absolute when app base URL is not set");
+  }
+
+  const redirect = redirectEnv && redirectEnv.startsWith("http") ? redirectEnv : new URL(redirectPath, base).toString();
+  return redirect;
+}
+
+function resolveJobberAuthUrl(origin?: string) {
+  const raw = process.env.JOBBER_AUTH_URL || DEFAULT_JOBBER_AUTH_URL;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = new URL(DEFAULT_JOBBER_AUTH_URL);
+  }
+
+  if (origin) {
+    const originUrl = new URL(origin);
+    // Avoid redirect loops if misconfigured to point back at this route
+    if (url.origin === originUrl.origin && url.pathname.includes("/api/jobber")) {
+      return DEFAULT_JOBBER_AUTH_URL;
+    }
+  }
+
+  return url.toString();
+}
 
 export type JobberRequestEdge = {
   node: {
@@ -38,17 +99,36 @@ export type JobberRequestEdge = {
   };
 };
 
-export function buildJobberAuthUrl() {
-  if (!isJobberConfigured || !process.env.JOBBER_AUTH_URL) return null;
-  const authUrl = new URL(process.env.JOBBER_AUTH_URL);
-  authUrl.searchParams.set("client_id", process.env.JOBBER_CLIENT_ID!);
-  authUrl.searchParams.set("redirect_uri", process.env.JOBBER_REDIRECT_URI!);
+export type JobberTokenResponse = JobberTokenRow & { expires_in?: number };
+
+function normalizeTokenResponse(token: JobberTokenResponse): JobberTokenRow {
+  const expiresAt =
+    token.expires_at ??
+    (token.expires_in ? Math.floor(Date.now() / 1000) + token.expires_in : undefined);
+  return { ...token, expires_at: expiresAt };
+}
+
+export function buildJobberAuthUrl(origin?: string) {
+  if (!process.env.JOBBER_CLIENT_ID || !process.env.JOBBER_CLIENT_SECRET) {
+    throw new Error("Jobber OAuth env vars are missing. Set JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET.");
+  }
+
+  const authUrl = new URL(resolveJobberAuthUrl(origin));
+  const redirectUri = resolveJobberRedirectUri(origin);
+
+  authUrl.searchParams.set("client_id", process.env.JOBBER_CLIENT_ID);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("scope", "read write");
   return authUrl.toString();
 }
 
-export async function exchangeCodeForTokens(code: string) {
+export async function exchangeCodeForTokens(code: string, origin?: string) {
+  if (!process.env.JOBBER_CLIENT_ID || !process.env.JOBBER_CLIENT_SECRET) {
+    throw new Error("Jobber OAuth env vars are missing. Set JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET.");
+  }
+
+  const redirectUri = resolveJobberRedirectUri(origin);
   const res = await fetch(JOBBER_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -62,18 +142,22 @@ export async function exchangeCodeForTokens(code: string) {
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: process.env.JOBBER_REDIRECT_URI!,
+      redirect_uri: redirectUri,
     }),
   });
 
-  const tokenData = await res.json();
-  if (!tokenData.access_token) {
-    throw new Error("Failed to exchange OAuth code for tokens");
+  const tokenData = (await res.json()) as JobberTokenResponse;
+  if (!res.ok || !tokenData.access_token) {
+    throw new Error(`Failed to exchange OAuth code for tokens (${res.status}): ${tokenData.error_description || tokenData.error || "unknown error"}`);
   }
-  return tokenData as JobberTokenRow;
+  return normalizeTokenResponse(tokenData);
 }
 
 export async function refreshJobberToken(refreshToken: string) {
+  if (!process.env.JOBBER_CLIENT_ID || !process.env.JOBBER_CLIENT_SECRET) {
+    throw new Error("Jobber OAuth env vars are missing. Set JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET.");
+  }
+
   const res = await fetch(JOBBER_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -90,11 +174,11 @@ export async function refreshJobberToken(refreshToken: string) {
     }),
   });
 
-  const tokenData = await res.json();
+  const tokenData = (await res.json()) as JobberTokenResponse;
   if (!res.ok) {
     throw new Error("Failed to refresh Jobber token: " + JSON.stringify(tokenData));
   }
-  return tokenData as JobberTokenRow;
+  return normalizeTokenResponse(tokenData);
 }
 
 export async function fetchJobberBusinessId(accessToken: string) {
