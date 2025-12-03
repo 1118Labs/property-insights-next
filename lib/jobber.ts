@@ -99,13 +99,29 @@ export type JobberRequestEdge = {
   };
 };
 
-export type JobberTokenResponse = JobberTokenRow & { expires_in?: number };
+/**
+ * FIXED TYPE — THIS WAS BREAKING THE BUILD
+ */
+export type JobberTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
+
+  // Jobber error formats (required for TS to compile)
+  error?: string;
+  error_description?: string;
+
+  // original DB fields
+  expires_at?: number;
+  jobber_account_id?: string;
+};
 
 function normalizeTokenResponse(token: JobberTokenResponse): JobberTokenRow {
   const expiresAt =
     token.expires_at ??
     (token.expires_in ? Math.floor(Date.now() / 1000) + token.expires_in : undefined);
-  return { ...token, expires_at: expiresAt };
+  return { ...token, expires_at: expiresAt } as JobberTokenRow;
 }
 
 export function buildJobberAuthUrl(origin?: string) {
@@ -129,6 +145,7 @@ export async function exchangeCodeForTokens(code: string, origin?: string) {
   }
 
   const redirectUri = resolveJobberRedirectUri(origin);
+
   const res = await fetch(JOBBER_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -148,8 +165,11 @@ export async function exchangeCodeForTokens(code: string, origin?: string) {
 
   const tokenData = (await res.json()) as JobberTokenResponse;
   if (!res.ok || !tokenData.access_token) {
-    throw new Error(`Failed to exchange OAuth code for tokens (${res.status}): ${tokenData.error_description || tokenData.error || "unknown error"}`);
+    throw new Error(
+      `Failed to exchange OAuth code for tokens (${res.status}): ${tokenData.error_description || tokenData.error || "unknown error"}`
+    );
   }
+
   return normalizeTokenResponse(tokenData);
 }
 
@@ -319,7 +339,6 @@ export async function fetchRecentJobberRequests(accessToken: string, limit = 10)
   }
   const json = JSON.parse(text);
   const edges = (json?.data?.requests?.edges as JobberRequestEdge[] | undefined) ?? [];
-  // Filter out malformed edges to avoid ingestion errors
   return edges.filter((edge) => edge?.node?.id);
 }
 
