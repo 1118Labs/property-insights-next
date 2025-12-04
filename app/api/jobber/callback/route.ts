@@ -1,88 +1,94 @@
-// app/api/jobber/callback/route.ts
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-import { NextRequest, NextResponse } from "next/server";
-import {
-  exchangeCodeForTokens,
-  storeJobberTokens,
-  missingJobberEnvResponse,
-} from "@/lib/jobber";
-
-function hasJobberEnv() {
-  return Boolean(
-    process.env.JOBBER_CLIENT_ID &&
-      process.env.JOBBER_CLIENT_SECRET &&
-      process.env.JOBBER_REDIRECT_URI
-  );
-}
-
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-
-  // Basic sanity check for envs
-  if (!hasJobberEnv()) {
-    console.error("[jobber/callback] Missing Jobber env vars", {
-      hasClientId: !!process.env.JOBBER_CLIENT_ID,
-      hasClientSecret: !!process.env.JOBBER_CLIENT_SECRET,
-      hasRedirectUri: !!process.env.JOBBER_REDIRECT_URI,
-    });
-
-    return NextResponse.json(
-      {
-        error: "missing_env",
-        ...missingJobberEnvResponse(),
-      },
-      { status: 500 }
-    );
-  }
-
-  if (!code) {
-    console.error("[jobber/callback] Missing ?code param from Jobber");
-    return NextResponse.json(
-      {
-        error: "missing_code",
-        message: "Jobber did not return an authorization code.",
-      },
-      { status: 400 }
-    );
-  }
-
+export async function GET(req: Request) {
   try {
-    console.log("[jobber/callback] Exchanging code for Jobber tokens…");
+    const url = new URL(req.url);
+    const code = url.searchParams.get("code");
 
-    // 1) Exchange the OAuth code for tokens (already working)
-    const tokenRow = await exchangeCodeForTokens(code, url.origin);
+    if (!code) {
+      return NextResponse.json(
+        { error: "callback_failed", message: "Missing OAuth code" },
+        { status: 400 }
+      );
+    }
 
-    console.log("[jobber/callback] Token exchange succeeded, storing in Supabase…");
-
-    // 2) Persist tokens in Supabase (jobber_tokens table)
-    const stored = await storeJobberTokens(tokenRow);
-
-    console.log("[jobber/callback] Tokens stored in Supabase", {
-      jobber_account_id: stored.jobber_account_id,
-    });
-
-    // 3) Return a clean JSON payload (same shape as before, but now persisted)
-    return NextResponse.json({
-      success: true,
-      tokens: {
-        jobber_account_id: stored.jobber_account_id,
-        access_token: stored.access_token,
-        refresh_token: stored.refresh_token,
-        expires_at: stored.expires_at,
+    // Exchange code for tokens via Jobber
+    const tokenRes = await fetch("https://api.getjobber.com/api/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    });
-  } catch (err: any) {
-    console.error("[jobber/callback] Error during callback", {
-      message: err?.message,
-      stack: err?.stack,
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: "https://property-insights-app.netlify.app/api/jobber/callback",
+        client_id: process.env.JOBBER_CLIENT_ID,
+        client_secret: process.env.JOBBER_CLIENT_SECRET,
+      }),
     });
 
-    return NextResponse.json(
+    const tokenJson = await tokenRes.json();
+
+    if (!tokenRes.ok) {
+      return NextResponse.json(
+        { error: "callback_failed", message: tokenJson },
+        { status: 500 }
+      );
+    }
+
+    // 🔥 Correct Jobber fields:
+    const access_token = tokenJson.access_token;
+    const refresh_token = tokenJson.refresh_token;
+    const expires_in = tokenJson.expires_in;
+
+    // 🔥 FIX: Jobber returns account_id, not jobber_account_id
+    const jobber_account_id = tokenJson.account_id;
+
+    if (!jobber_account_id) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: "Jobber returned no account_id. Cannot store tokens.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const expires_at = Math.floor(Date.now() / 1000) + expires_in;
+
+    // Save to Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await supabase.from("jobber_tokens").upsert(
       {
-        error: "callback_failed",
-        message: err?.message || "Unknown error during Jobber OAuth callback.",
+        jobber_account_id,
+        access_token,
+        refresh_token,
+        expires_at,
       },
+      {
+        onConflict: "jobber_account_id",
+      }
+    );
+
+    if (error) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: error.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "callback_failed", message: err.message },
       { status: 500 }
     );
   }
