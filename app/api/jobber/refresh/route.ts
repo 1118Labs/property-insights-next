@@ -23,36 +23,45 @@ export async function GET() {
 
     const refresh_token = row.refresh_token;
 
-    // -----------------------------------------------------
-    // CORRECT JOBBER ENDPOINT (2024–2025)
-    // DO NOT CHANGE THIS AGAIN
-    // -----------------------------------------------------
-    const res = await fetch("https://api.getjobber.com/api/oauth/access_token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "refresh_token",
-        refresh_token,
-        client_id: process.env.JOBBER_CLIENT_ID,
-        client_secret: process.env.JOBBER_CLIENT_SECRET,
-      }),
+    // -------------------------------
+    // JOBBER REFRESH TOKEN CALL
+    // MUST use x-www-form-urlencoded
+    // MUST hit /oauth/access_token
+    // -------------------------------
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token,
+      client_id: process.env.JOBBER_CLIENT_ID!,
+      client_secret: process.env.JOBBER_CLIENT_SECRET!,
     });
 
-    // Jobber returns JSON when the URL is correct.
-    // Jobber returns HTML if the URL is wrong.
-    const json = await res.json();
+    const res = await fetch(
+      "https://api.getjobber.com/api/oauth/access_token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      }
+    );
 
-    if (!res.ok) {
+    const json = await res.json().catch(() => null);
+
+    if (!res.ok || !json) {
       return NextResponse.json(
         {
           error: "refresh_failed",
-          message: json.error_description || json.error || "Unknown refresh error",
+          message:
+            json?.error_description ||
+            json?.error ||
+            "Jobber returned invalid response",
         },
         { status: 400 }
       );
     }
 
-    // Update rotated tokens in DB
+    // Update tokens in DB
     const { error: updateErr } = await supabase
       .from("jobber_tokens")
       .update({
