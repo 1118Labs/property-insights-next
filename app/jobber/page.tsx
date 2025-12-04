@@ -1,8 +1,9 @@
 "use client";
 
 export default function JobberConnectPage() {
+
   function connect() {
-    window.location.assign("/api/jobber/authorize");
+    window.location.href = "/api/jobber/authorize";
   }
 
   return (
@@ -14,12 +15,11 @@ export default function JobberConnectPage() {
         onClick={connect}
         style={{
           padding: "10px 20px",
-          backgroundColor: "#007aff",
+          backgroundColor: "#0070f3",
           color: "white",
           border: "none",
           borderRadius: "6px",
           cursor: "pointer",
-          marginTop: "20px",
         }}
       >
         Connect to Jobber
