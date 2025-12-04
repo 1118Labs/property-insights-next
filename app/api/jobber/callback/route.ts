@@ -78,7 +78,6 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${access_token}`,
-        // Optional but recommended; falls back to a sane default
         "X-JOBBER-GRAPHQL-VERSION":
           process.env.JOBBER_GRAPHQL_VERSION || "2023-11-15",
       },
@@ -150,8 +149,6 @@ export async function GET(req: Request) {
     const { error } = await supabase.from("jobber_tokens").upsert(
       {
         jobber_account_id,
-        // We’re not storing jobber_user_id yet to avoid schema issues.
-        // jobber_user_id,
         access_token,
         refresh_token,
         expires_at,
@@ -166,11 +163,12 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      jobber_account_id,
-      jobber_user_id,
-    });
+    //
+    // FINAL STEP — Redirect to UI page instead of returning JSON
+    //
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/jobber/connected?account=${jobber_account_id}`
+    );
   } catch (err: any) {
     return NextResponse.json(
       { error: "callback_failed", message: err.message },
