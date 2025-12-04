@@ -1,65 +1,47 @@
 import { NextResponse } from "next/server";
-import { exchangeCodeForTokens, storeJobberTokens } from "@/lib/jobber";
-import { createCorrelationId } from "@/lib/utils/correlation";
+import { exchangeCodeForTokens } from "@/lib/jobber";
+import { resolveBaseUrl } from "@/lib/jobber";
 
-export const runtime = "nodejs";
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
+  const origin = url.origin;
 
-export async function GET(request: Request) {
-  const correlationId = createCorrelationId();
+  if (!code) {
+    return NextResponse.json(
+      { error: "missing_code", message: "No OAuth code was provided." },
+      { status: 400 }
+    );
+  }
 
   try {
-    const url = new URL(request.url);
-    const code = url.searchParams.get("code");
-    const origin = request.headers.get("origin") || url.origin;
+    // ============================================
+    // RAW DEBUG LOGGING BEFORE TOKEN EXCHANGE
+    // ============================================
+    console.log("=== JOBBER CALLBACK DEBUG START ===");
+    console.log("Request Origin:", origin);
+    console.log("JOBBER_CLIENT_ID:", process.env.JOBBER_CLIENT_ID);
+    console.log("JOBBER_REDIRECT_URI:", process.env.JOBBER_REDIRECT_URI);
+    console.log("JOBBER_TOKEN_URL:", process.env.JOBBER_TOKEN_URL);
+    console.log("=== JOBBER CALLBACK DEBUG END ===");
 
-    // 🔥🔥🔥 TEMPORARY ENV CHECK — PRINTS TO NETLIFY FUNCTION LOGS 🔥🔥🔥
-    console.log("🔥 ENV CHECK (callback):", {
-      has_client_id: !!process.env.JOBBER_CLIENT_ID,
-      has_client_secret: !!process.env.JOBBER_CLIENT_SECRET,
-      has_redirect_uri: !!process.env.JOBBER_REDIRECT_URI,
-      client_id_length: process.env.JOBBER_CLIENT_ID?.length || 0,
-      redirect_uri_value: process.env.JOBBER_REDIRECT_URI,
-      node_env: process.env.NODE_ENV,
-    });
-    // END TEMP BLOCK ------------------------------------------------------
-
-    if (!code) {
-      return NextResponse.json(
-        {
-          error: "missing_code",
-          message: "Jobber returned no authorization code",
-          correlationId,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Exchange the code for tokens
-    const tokenResponse = await exchangeCodeForTokens(code, origin);
-
-    // Store tokens in Supabase
-    const stored = await storeJobberTokens(tokenResponse);
+    // ============================================
+    // Attempt exchange
+    // ============================================
+    const tokens = await exchangeCodeForTokens(code, origin);
 
     return NextResponse.json(
-      {
-        ok: true,
-        correlationId,
-        stored,
-      },
+      { success: true, tokens },
       { status: 200 }
     );
+
   } catch (err: any) {
-    console.error("🔥 Callback error:", {
-      message: err?.message,
-      stack: err?.stack,
-      correlationId,
-    });
+    console.error("CALLBACK ERROR:", err.message);
 
     return NextResponse.json(
       {
         error: "callback_failed",
-        message: err?.message,
-        correlationId,
+        message: err?.message || String(err),
       },
       { status: 500 }
     );
