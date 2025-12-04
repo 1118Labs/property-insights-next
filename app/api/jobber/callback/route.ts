@@ -29,7 +29,21 @@ export async function GET(req: Request) {
       }),
     });
 
-    const tokenJson = await tokenRes.json();
+    const tokenText = await tokenRes.text();
+
+    let tokenJson: any;
+    try {
+      tokenJson = JSON.parse(tokenText);
+    } catch (e) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: "Token endpoint did not return JSON",
+          details: tokenText.slice(0, 200),
+        },
+        { status: 400 }
+      );
+    }
 
     if (!tokenRes.ok) {
       return NextResponse.json(
@@ -46,44 +60,87 @@ export async function GET(req: Request) {
     const expires_in = tokenJson.expires_in || 3600;
     const expires_at = Math.floor(Date.now() / 1000) + expires_in;
 
-    //
-    // STEP 2 — Call /api/user to retrieve account_id + user_id
-    //
-    const userRes = await fetch("https://api.getjobber.com/api/user", {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-
-    const userJson = await userRes.json();
-
-    if (!userRes.ok || !userJson?.user) {
+    if (!access_token) {
       return NextResponse.json(
         {
           error: "callback_failed",
-          message: "Unable to fetch Jobber user profile.",
-          details: userJson,
+          message: "No access_token returned from Jobber",
         },
         { status: 400 }
       );
     }
 
-    const jobber_account_id = userJson.user.account_id;
-    const jobber_user_id = userJson.user.id;
+    //
+    // STEP 2 — Use GraphQL to get account + user IDs
+    //
+    const graphRes = await fetch("https://api.getjobber.com/api/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${access_token}`,
+        // Optional but recommended; falls back to a sane default
+        "X-JOBBER-GRAPHQL-VERSION":
+          process.env.JOBBER_GRAPHQL_VERSION || "2023-11-15",
+      },
+      body: JSON.stringify({
+        query: `
+          query WhoAmI {
+            account {
+              id
+            }
+            user {
+              id
+            }
+          }
+        `,
+        operationName: "WhoAmI",
+      }),
+    });
+
+    const graphText = await graphRes.text();
+
+    let graphJson: any;
+    try {
+      graphJson = JSON.parse(graphText);
+    } catch (e) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: "GraphQL endpoint did not return JSON",
+          details: graphText.slice(0, 200),
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!graphRes.ok || graphJson.errors) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: "Error from Jobber GraphQL user/account query",
+          details: graphJson.errors || graphJson,
+        },
+        { status: 400 }
+      );
+    }
+
+    const jobber_account_id = graphJson?.data?.account?.id || null;
+    const jobber_user_id = graphJson?.data?.user?.id || null;
 
     if (!jobber_account_id) {
       return NextResponse.json(
         {
           error: "callback_failed",
           message:
-            "Jobber user profile did not include account_id. Cannot store tokens.",
+            "Jobber GraphQL response did not include account.id. Cannot store tokens.",
+          details: graphJson.data,
         },
         { status: 400 }
       );
     }
 
     //
-    // STEP 3 — Store tokens + account_id + user_id in Supabase
+    // STEP 3 — Store tokens + account_id in Supabase
     //
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,7 +150,8 @@ export async function GET(req: Request) {
     const { error } = await supabase.from("jobber_tokens").upsert(
       {
         jobber_account_id,
-        jobber_user_id,
+        // We’re not storing jobber_user_id yet to avoid schema issues.
+        // jobber_user_id,
         access_token,
         refresh_token,
         expires_at,
@@ -108,7 +166,11 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      jobber_account_id,
+      jobber_user_id,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: "callback_failed", message: err.message },
