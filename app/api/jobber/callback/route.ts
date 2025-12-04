@@ -13,18 +13,19 @@ export async function GET(req: Request) {
       );
     }
 
-    // Exchange code for tokens via Jobber
+    //
+    // STEP 1 — Exchange code for access + refresh tokens
+    //
     const tokenRes = await fetch("https://api.getjobber.com/api/oauth/token", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         grant_type: "authorization_code",
         code,
-        redirect_uri: "https://property-insights-app.netlify.app/api/jobber/callback",
         client_id: process.env.JOBBER_CLIENT_ID,
         client_secret: process.env.JOBBER_CLIENT_SECRET,
+        redirect_uri:
+          "https://property-insights-app.netlify.app/api/jobber/callback",
       }),
     });
 
@@ -32,32 +33,58 @@ export async function GET(req: Request) {
 
     if (!tokenRes.ok) {
       return NextResponse.json(
-        { error: "callback_failed", message: tokenJson },
-        { status: 500 }
+        {
+          error: "callback_failed",
+          message: tokenJson.error_description || tokenJson,
+        },
+        { status: 400 }
       );
     }
 
-    // 🔥 Correct Jobber fields:
     const access_token = tokenJson.access_token;
     const refresh_token = tokenJson.refresh_token;
-    const expires_in = tokenJson.expires_in;
+    const expires_in = tokenJson.expires_in || 3600;
+    const expires_at = Math.floor(Date.now() / 1000) + expires_in;
 
-    // 🔥 FIX: Jobber returns account_id, not jobber_account_id
-    const jobber_account_id = tokenJson.account_id;
+    //
+    // STEP 2 — Call /api/user to retrieve account_id + user_id
+    //
+    const userRes = await fetch("https://api.getjobber.com/api/user", {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    const userJson = await userRes.json();
+
+    if (!userRes.ok || !userJson?.user) {
+      return NextResponse.json(
+        {
+          error: "callback_failed",
+          message: "Unable to fetch Jobber user profile.",
+          details: userJson,
+        },
+        { status: 400 }
+      );
+    }
+
+    const jobber_account_id = userJson.user.account_id;
+    const jobber_user_id = userJson.user.id;
 
     if (!jobber_account_id) {
       return NextResponse.json(
         {
           error: "callback_failed",
-          message: "Jobber returned no account_id. Cannot store tokens.",
+          message:
+            "Jobber user profile did not include account_id. Cannot store tokens.",
         },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
-    const expires_at = Math.floor(Date.now() / 1000) + expires_in;
-
-    // Save to Supabase
+    //
+    // STEP 3 — Store tokens + account_id + user_id in Supabase
+    //
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -66,22 +93,18 @@ export async function GET(req: Request) {
     const { error } = await supabase.from("jobber_tokens").upsert(
       {
         jobber_account_id,
+        jobber_user_id,
         access_token,
         refresh_token,
         expires_at,
       },
-      {
-        onConflict: "jobber_account_id",
-      }
+      { onConflict: "jobber_account_id" }
     );
 
     if (error) {
       return NextResponse.json(
-        {
-          error: "callback_failed",
-          message: error.message,
-        },
-        { status: 500 }
+        { error: "callback_failed", message: error.message },
+        { status: 400 }
       );
     }
 
