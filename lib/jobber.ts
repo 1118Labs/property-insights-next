@@ -481,7 +481,7 @@ export function mapJobberEdgeToRecords(edge: any) {
   const clientRecord: ClientRecord = {
     jobberClientId: client.id,
     firstName: client.firstName,
-    lastName: client.lastlastName,
+    lastName: client.lastName,
     email: client.email,
     phone: client.phone,
   };
