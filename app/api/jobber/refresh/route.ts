@@ -1,53 +1,78 @@
 import { NextResponse } from "next/server";
-import {
-  getLatestJobberTokens,
-  refreshJobberToken,
-  storeJobberTokens,
-} from "@/lib/jobber";
-import { createCorrelationId } from "@/lib/utils/correlation";
-
-export const runtime = "nodejs";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET() {
-  const correlationId = createCorrelationId();
-
   try {
-    const latest = await getLatestJobberTokens();
-    if (!latest?.refresh_token) {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Load stored tokens
+    const { data: row, error: loadErr } = await supabase
+      .from("jobber_tokens")
+      .select("*")
+      .single();
+
+    if (loadErr || !row) {
+      return NextResponse.json(
+        { error: "missing_tokens", message: "No tokens found." },
+        { status: 400 }
+      );
+    }
+
+    const refresh_token = row.refresh_token;
+
+    // Ask Jobber for new tokens
+    const res = await fetch("https://api.getjobber.com/api/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token,
+        client_id: process.env.JOBBER_CLIENT_ID,
+        client_secret: process.env.JOBBER_CLIENT_SECRET,
+      }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
       return NextResponse.json(
         {
-          error: "no_refresh_token",
-          message: "No Jobber refresh token is available.",
-          correlationId,
+          error: "refresh_failed",
+          message: json.error_description || json.error || "Unknown refresh error",
         },
         { status: 400 }
       );
     }
 
-    const refreshed = await refreshJobberToken(latest.refresh_token);
+    // Update rotated tokens in DB
+    const { error: updateErr } = await supabase
+      .from("jobber_tokens")
+      .update({
+        access_token: json.access_token,
+        refresh_token: json.refresh_token,
+        expires_at: Math.floor(Date.now() / 1000) + json.expires_in,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
 
-    await storeJobberTokens({
-      ...refreshed,
-      jobber_account_id: latest.jobber_account_id,
+    if (updateErr) {
+      return NextResponse.json(
+        { error: "db_error", message: updateErr.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      refreshed_at: new Date().toISOString(),
     });
 
+  } catch (err) {
     return NextResponse.json(
-      {
-        status: "ok",
-        refreshed: true,
-        correlationId,
-      },
-      { status: 200 }
-    );
-  } catch (err: any) {
-    console.error("Jobber refresh error:", err);
-
-    return NextResponse.json(
-      {
-        error: "jobber_refresh_failed",
-        message: err?.message,
-        correlationId,
-      },
+      { error: "server_error", message: String(err) },
       { status: 500 }
     );
   }
