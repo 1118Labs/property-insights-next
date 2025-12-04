@@ -1,5 +1,5 @@
 // ===========================================
-// lib/jobber.ts — FULL FINAL VERSION (WITH CLOUDFLARE HEADERS)
+// lib/jobber.ts — FULL VERSION (BODY-BASED OAUTH CREDS)
 // ===========================================
 
 import { requireAdminClient } from "./supabase/server";
@@ -145,7 +145,7 @@ export function buildJobberAuthUrl(origin?: string) {
 }
 
 // -------------------------------------------
-// Exchange OAuth Code for Tokens (WITH CLOUDFLARE SAFE HEADERS)
+// Exchange OAuth Code for Tokens (BODY CREDS)
 // -------------------------------------------
 export async function exchangeCodeForTokens(
   code: string,
@@ -159,31 +159,21 @@ export async function exchangeCodeForTokens(
 
   const redirectUri = resolveJobberRedirectUri(origin);
 
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri,
+    client_id: process.env.JOBBER_CLIENT_ID,
+    client_secret: process.env.JOBBER_CLIENT_SECRET,
+  });
+
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.JOBBER_CLIENT_ID +
-            ":" +
-            process.env.JOBBER_CLIENT_SECRET
-        ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
-
-      // -------------------------------------------
-      // 🔥 REQUIRED HEADERS FOR CLOUDFLARE PROTECTION
-      // -------------------------------------------
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
       Accept: "application/json",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "no-cache",
     },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-    }),
+    body,
   });
 
   const raw = await res.text();
@@ -211,7 +201,7 @@ export async function exchangeCodeForTokens(
 }
 
 // -------------------------------------------
-// Refresh Token
+// Refresh Token (BODY CREDS)
 // -------------------------------------------
 export async function refreshJobberToken(refreshToken: string) {
   if (!process.env.JOBBER_CLIENT_ID || !process.env.JOBBER_CLIENT_SECRET)
@@ -220,23 +210,20 @@ export async function refreshJobberToken(refreshToken: string) {
   const TOKEN_URL =
     process.env.JOBBER_TOKEN_URL?.trim() || DEFAULT_JOBBER_TOKEN_URL;
 
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: process.env.JOBBER_CLIENT_ID,
+    client_secret: process.env.JOBBER_CLIENT_SECRET,
+  });
+
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.JOBBER_CLIENT_ID +
-            ":" +
-            process.env.JOBBER_CLIENT_SECRET
-        ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
+    body,
   });
 
   const raw = await res.text();
