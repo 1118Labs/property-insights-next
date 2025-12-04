@@ -23,8 +23,11 @@ export async function GET() {
 
     const refresh_token = row.refresh_token;
 
-    // Ask Jobber for new tokens
-    const res = await fetch("https://api.getjobber.com/api/oauth/token", {
+    // -----------------------------------------------------
+    // CORRECT JOBBER ENDPOINT (2024–2025)
+    // DO NOT CHANGE THIS AGAIN
+    // -----------------------------------------------------
+    const res = await fetch("https://api.getjobber.com/api/oauth/access_token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -35,6 +38,8 @@ export async function GET() {
       }),
     });
 
+    // Jobber returns JSON when the URL is correct.
+    // Jobber returns HTML if the URL is wrong.
     const json = await res.json();
 
     if (!res.ok) {
