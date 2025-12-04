@@ -1,39 +1,36 @@
 import { NextResponse } from "next/server";
-import {
-  getLatestJobberTokens,
-  isTokenStale,
-} from "@/lib/jobber";
-import { createCorrelationId } from "@/lib/utils/correlation";
 import { isSupabaseConfigured, isJobberConfigured } from "@/lib/config";
+import { getLatestJobberTokens, isTokenStale } from "@/lib/jobber";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const correlationId = createCorrelationId();
-
   try {
-    const supabaseOk = isSupabaseConfigured();
-    const jobberOk = isJobberConfigured();
+    const supabaseOk = isSupabaseConfigured; // BOOLEAN, not function
+    const jobberOk = isJobberConfigured;     // BOOLEAN, not function
 
-    const latest = await getLatestJobberTokens();
-    const stale = isTokenStale(latest);
+    let latestToken = null;
+    let stale = null;
 
-    return NextResponse.json(
-      {
-        supabase: supabaseOk ? "ok" : "missing",
-        jobber: jobberOk ? "ok" : "missing",
-        jobberToken: latest ? "present" : "missing",
-        isTokenStale: stale,
-        correlationId,
-      },
-      { status: 200 }
-    );
+    try {
+      latestToken = await getLatestJobberTokens();
+      stale = isTokenStale(latestToken);
+    } catch (err) {
+      // swallow token lookup errors so health endpoint still responds
+    }
+
+    return NextResponse.json({
+      status: "ok",
+      supabase: supabaseOk ? "ok" : "not_configured",
+      jobber: jobberOk ? "ok" : "not_configured",
+      jobberTokenPresent: latestToken ? true : false,
+      jobberTokenStale: stale,
+    });
   } catch (err: any) {
     return NextResponse.json(
       {
-        error: "health_check_failed",
-        message: err?.message,
-        correlationId,
+        status: "error",
+        message: err?.message || "unknown error",
       },
       { status: 500 }
     );
