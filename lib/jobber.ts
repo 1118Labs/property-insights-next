@@ -1,5 +1,5 @@
 // ===========================================
-// lib/jobber.ts — FULL FINAL VERSION (DO NOT EDIT)
+// lib/jobber.ts — FULL FINAL VERSION (WITH CLOUDFLARE HEADERS)
 // ===========================================
 
 import { requireAdminClient } from "./supabase/server";
@@ -145,7 +145,7 @@ export function buildJobberAuthUrl(origin?: string) {
 }
 
 // -------------------------------------------
-// Exchange OAuth Code for Tokens (Jobber Bug-Safe)
+// Exchange OAuth Code for Tokens (WITH CLOUDFLARE SAFE HEADERS)
 // -------------------------------------------
 export async function exchangeCodeForTokens(
   code: string,
@@ -170,7 +170,14 @@ export async function exchangeCodeForTokens(
             process.env.JOBBER_CLIENT_SECRET
         ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
+
+      // -------------------------------------------
+      // 🔥 REQUIRED HEADERS FOR CLOUDFLARE PROTECTION
+      // -------------------------------------------
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
       Accept: "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
     },
     body: new URLSearchParams({
       grant_type: "authorization_code",
@@ -474,7 +481,7 @@ export function mapJobberEdgeToRecords(edge: any) {
   const clientRecord: ClientRecord = {
     jobberClientId: client.id,
     firstName: client.firstName,
-    lastName: client.lastName,
+    lastName: client.lastlastName,
     email: client.email,
     phone: client.phone,
   };
