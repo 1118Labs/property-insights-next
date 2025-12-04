@@ -4,7 +4,7 @@ import { createCorrelationId } from "@/lib/utils/correlation";
 
 export const runtime = "nodejs";
 
-// Shared handler so both /auth and /authorize call same logic
+// Shared handler for /auth and /authorize
 export async function handleJobberAuth(request: Request) {
   const origin = request.headers.get("origin") || new URL(request.url).origin;
   const correlationId = createCorrelationId();
