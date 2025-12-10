@@ -1,32 +1,10 @@
-async function fetchStatus() {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/jobber/status`, {
-      cache: "no-store",
-    });
-    return await res.json();
-  } catch {
-    return { connected: false, error: "Failed to load status" };
-  }
-}
-
-async function fetchUsage() {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/admin/usage/summary`, {
-      cache: "no-store",
-    });
-    return await res.json();
-  } catch {
-    return { metrics: null, error: "Failed to load usage" };
-  }
-}
-
 import { headers } from "next/headers";
 import { getCurrentUserFromRequest } from "@/lib/currentUser";
+import { requireAdminClient } from "@/lib/supabase/server";
 
 export default async function SystemHealthPage() {
-  const user = await getCurrentUserFromRequest(
-    new Request("http://local", { headers: headers() })
-  );
+  // Recommended fix — no manual Request construction
+  const user = await getCurrentUserFromRequest();
 
   if (!user || user.role !== "owner") {
     return (
@@ -41,56 +19,76 @@ export default async function SystemHealthPage() {
     );
   }
 
-  const [status, usage] = await Promise.all([fetchStatus(), fetchUsage()]);
+  const admin = requireAdminClient();
+
+  const { data: accounts, error: accountsError } = await admin
+    .from("accounts")
+    .select("*")
+    .limit(50);
+
+  const { data: usage, error: usageError } = await admin
+    .from("usage_daily")
+    .select("*")
+    .order("day", { ascending: false })
+    .limit(30);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#021C36]/90 via-[#0c2a49] to-[#04152b] px-6 py-10 text-slate-50">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-4">
         <div>
           <div className="text-xs uppercase tracking-[0.2em] text-white/60">
             Admin
           </div>
-          <h1 className="text-3xl font-bold text-white">System health</h1>
+          <h1 className="text-3xl font-bold text-white">System Health</h1>
           <p className="text-sm text-white/70">
-            Connection status, usage snapshot, and sync signals.
+            Overview of accounts, usage, and system performance.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/25 backdrop-blur">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/60">
-              Jobber connection
-            </div>
-            <div className="mt-2 text-2xl font-bold text-white">
-              {status.connected ? "Connected" : "Not connected"}
-            </div>
-            <div className="text-xs text-white/70">
-              {status.connected
-                ? `Account: ${status.jobber_account_id ?? "unknown"}`
-                : status.error ?? "Check Jobber tokens"}
-            </div>
-          </div>
+        {/* Accounts Section */}
+        <div className="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-xl shadow-black/30 backdrop-blur">
+          <h2 className="text-xl font-semibold text-white mb-4">Accounts</h2>
 
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/25 backdrop-blur">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/60">
-              Last sync
+          {accountsError && (
+            <div className="rounded-xl bg-red-500/20 p-3 text-red-200">
+              Failed to load accounts: {accountsError.message}
             </div>
-            <div className="mt-2 text-2xl font-bold text-white">Manual</div>
-            <div className="text-xs text-white/70">
-              Cron sync endpoint available (/api/cron/sync-jobber-requests).
-            </div>
-          </div>
+          )}
 
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/25 backdrop-blur">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/60">
-              Usage snapshot (month)
+          <ul className="space-y-2 text-white/90">
+            {accounts?.map((acc: any) => (
+              <li key={acc.id} className="text-sm">
+                {acc.business_name || "Unnamed"} — {acc.jobber_account_id}
+              </li>
+            ))}
+
+            {!accounts?.length && !accountsError && (
+              <li className="text-white/60 text-sm">No accounts found.</li>
+            )}
+          </ul>
+        </div>
+
+        {/* Usage Section */}
+        <div className="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-xl shadow-black/30 backdrop-blur">
+          <h2 className="text-xl font-semibold text-white mb-4">Daily Usage</h2>
+
+          {usageError && (
+            <div className="rounded-xl bg-red-500/20 p-3 text-red-200">
+              Failed to load usage: {usageError.message}
             </div>
-            <div className="mt-2 space-y-1 text-sm text-white/80">
-              <div>Requests synced: {usage.metrics?.requests_synced ?? "—"}</div>
-              <div>Quotes generated: {usage.metrics?.quotes_generated ?? "—"}</div>
-              <div>Properties enriched: {usage.metrics?.properties_enriched ?? "—"}</div>
-            </div>
-          </div>
+          )}
+
+          <ul className="space-y-2 text-white/90">
+            {usage?.map((u: any) => (
+              <li key={u.day} className="text-sm">
+                {u.day}: {u.requests_synced} requests
+              </li>
+            ))}
+
+            {!usage?.length && !usageError && (
+              <li className="text-white/60 text-sm">No usage data found.</li>
+            )}
+          </ul>
         </div>
       </div>
     </div>
