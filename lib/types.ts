@@ -9,6 +9,18 @@ export type Address = {
   longitude?: number | null;
 };
 
+export type EnrichedProperty = {
+  address: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  lotSize?: number;
+  yearBuilt?: number;
+  latitude?: number;
+  longitude?: number;
+  estimatedValue?: number;
+};
+
 export type ClientRecord = {
   id?: string;
   jobberClientId?: string | null;

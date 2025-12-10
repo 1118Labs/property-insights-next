@@ -11,7 +11,7 @@ export default function AdminStatusPage() {
   const [uptime] = useState<string>("—");
   const [failures] = useState<number>(0);
   const [platforms, setPlatforms] = useState<PlatformHealth[]>([]);
-  const [summary, setSummary] = useState<{ total?: number; highRisk?: number }>({});
+  const [summary, setSummary] = useState<{ total?: number }>({});
 
   useEffect(() => {
     fetch("/api/health")
@@ -24,7 +24,7 @@ export default function AdminStatusPage() {
       .catch(() => {});
     fetch("/api/properties")
       .then((r) => r.json())
-      .then((b) => setSummary({ total: b.data?.summary?.total, highRisk: b.data?.summary?.highRisk }))
+      .then((b) => setSummary({ total: b.data?.summary?.total }))
       .catch(() => {});
   }, []);
 
@@ -83,7 +83,6 @@ export default function AdminStatusPage() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800">
             <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-300">Properties</p>
             <p className="text-lg font-semibold text-slate-900 dark:text-white">{summary.total ?? "—"}</p>
-            <p className="text-xs text-rose-600 dark:text-rose-300">{summary.highRisk ?? 0} high-risk</p>
           </div>
         </div>
       </div>

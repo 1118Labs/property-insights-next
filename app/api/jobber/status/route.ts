@@ -1,32 +1,30 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getJobberToken } from "@/lib/jobberTokens";
 
 export async function GET() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  try {
+    const { token, reason } = await getJobberToken({ requireValid: false });
 
-  const { data, error } = await supabase
-    .from("jobber_tokens")
-    .select("jobber_account_id, updated_at")
-    .limit(1)
-    .maybeSingle();
+    if (!token) {
+      if (reason === "missing_token") {
+        return NextResponse.json({ connected: false, reason: "no_token" });
+      }
+      return NextResponse.json({ connected: false, error: "token_resolution_failed" });
+    }
 
-  if (error) {
+    const expiresAt =
+      typeof token.expires_at === "number" ? token.expires_at : token.expires_at ?? null;
+    const now = Math.floor(Date.now() / 1000);
+
+    if (expiresAt !== null && expiresAt < now) {
+      return NextResponse.json({ connected: true, needs_refresh: true });
+    }
+
+    return NextResponse.json({ connected: true });
+  } catch {
     return NextResponse.json(
-      { connected: false, error: error.message },
-      { status: 500 }
+      { connected: false, error: "token_resolution_failed" },
+      { status: 200 }
     );
   }
-
-  if (!data) {
-    return NextResponse.json({ connected: false });
-  }
-
-  return NextResponse.json({
-    connected: true,
-    account_id: data.jobber_account_id,
-    last_updated: data.updated_at,
-  });
 }

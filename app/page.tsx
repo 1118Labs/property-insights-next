@@ -1,14 +1,19 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState, FormEvent } from "react";
 import { PropertyProfile } from "@/lib/types";
 import { PropertyInsightCard } from "@/components/PropertyInsightCard";
 import { StatsGrid } from "@/components/StatsGrid";
-import { ScoreBadge } from "@/components/ScoreBadge";
 import { formatAddress, normalizeAddress } from "@/lib/utils/address";
-import { InfoTooltip } from "@/components/InfoTooltip";
 import { logAnalyticsEvent } from "@/lib/utils/analytics";
-import Link from "next/link";
+import PIButton from "@/components/ui/PIButton";
+import PICard from "@/components/ui/PICard";
+
+type JobberStatus = {
+  connected?: boolean;
+};
 
 type StatusResponse = {
   supabase: { configured: boolean; enabled: boolean };
@@ -22,12 +27,18 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [normalizedAddress, setNormalizedAddress] = useState<string>("");
+  const [jobberStatus, setJobberStatus] = useState<"loading" | "connected" | "disconnected">("loading");
 
   useEffect(() => {
     fetch("/api/status")
       .then(async (r) => setStatus(await r.json()))
       .catch(() => null);
-    // Load a starter insight for demo
+    fetch("/api/jobber/status")
+      .then(async (r) => {
+        const json = (await r.json()) as JobberStatus;
+        setJobberStatus(json.connected ? "connected" : "disconnected");
+      })
+      .catch(() => setJobberStatus("disconnected"));
     (async () => {
       const res = await fetch("/api/property-insights", {
         method: "POST",
@@ -64,121 +75,179 @@ export default function Home() {
   };
 
   const stats = [
-    { label: "Operational Readiness", value: status?.jobber?.configured ? "Jobber wired" : "Jobber pending", helper: status?.jobber?.hasToken ? "Tokens saved" : "Connect to sync requests" },
-    { label: "Data Persistence", value: status?.supabase?.configured ? "Supabase ready" : "Mock mode", helper: status?.supabase?.configured ? "Writing insights to DB" : "Using in-memory mock" },
-    { label: "Coverage", value: profile ? `${profile.insights.riskFlags?.length || 0} risk flags` : "--", helper: "Auto scoring + recommendations" },
+    {
+      label: "Operational Readiness",
+      value: status?.jobber?.configured ? "Jobber wired" : "Jobber pending",
+      helper: status?.jobber?.hasToken ? "Tokens saved" : "Connect to sync requests",
+    },
+    {
+      label: "Data Persistence",
+      value: status?.supabase?.configured ? "Supabase ready" : "Mock mode",
+      helper: status?.supabase?.configured ? "Writing enrichment to DB" : "Using in-memory mock",
+    },
+    {
+      label: "Latest estimate",
+      value: profile?.insights?.valuation?.estimate
+        ? `$${profile.insights.valuation.estimate.toLocaleString()}`
+        : "Pending",
+      helper: "RentCast-powered enrichment",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 text-slate-900">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#0B1220]">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white font-bold">PI</div>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white ring-1 ring-[#E3E4EA]">
+            <Image src="/brand/pi-logo.png" alt="Property Insights" width={32} height={32} />
+          </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-emerald-700">Property Insights</p>
-            <p className="text-sm text-slate-600">Operate smarter. Quote faster.</p>
+            <p className="text-xs uppercase tracking-wide text-[#6B7280]">Property Insights</p>
+            <p className="text-sm text-[#4B5563]">Operate smarter. Quote faster.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 shadow">Demo data</span>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#021C36] ring-1 ring-[#E3E4EA]">
+              Demo data
+            </span>
           )}
           {status?.jobber?.tokenStatus && (
-            <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 shadow">
+            <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#021C36] ring-1 ring-[#E3E4EA]">
               Token: {status.jobber.tokenStatus}
             </div>
           )}
         </div>
-        <Link
-          className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50"
-          href="/properties"
-        >
+        <PIButton variant="secondary" href="/properties" className="rounded-full px-5 py-2 text-sm">
           Open Dashboard →
-        </Link>
+        </PIButton>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="overflow-hidden rounded-3xl bg-white p-8 shadow-lg ring-1 ring-emerald-100">
-          <div className="grid gap-8 lg:grid-cols-2">
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                Live MVP Stack • Next.js + Jobber + Supabase
+        <div className="mb-4 flex justify-start">
+          <span
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ring-1 ring-[#E3E4EA] ${
+              jobberStatus === "connected"
+                ? "bg-white text-[#021C36]"
+                : "bg-white text-[#6B7280]"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                jobberStatus === "connected" ? "bg-[#16A34A]" : "bg-[#D1D5DB]"
+              }`}
+            />
+            {jobberStatus === "loading"
+              ? "Checking Jobber…"
+              : jobberStatus === "connected"
+              ? "Jobber connected"
+              : "Jobber not connected"}
+          </span>
+        </div>
+        <PICard className="overflow-hidden rounded-[24px] border border-[#E3E4EA] p-8">
+          <div className="grid gap-10 lg:grid-cols-2">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#021C36] ring-1 ring-[#E3E4EA]">
+                Live Stack • Next.js + Jobber + Supabase
               </div>
-              <h1 className="text-4xl font-semibold leading-tight tracking-tight text-slate-900">
-                Turn service requests into instant property intelligence.
+              <h1 className="text-4xl font-semibold leading-tight tracking-tight text-[#0B1220]">
+                Turn service requests into instant property intel.
               </h1>
-              <p className="text-lg text-slate-700">
-                Connect Jobber, ingest requests, auto-score properties, and brief your crews with the context they need—without spreadsheets or manual prep.
+              <p className="text-lg text-[#4B5563]">
+                Connect Jobber, enrich properties with RentCast, and brief your crews with the basics—beds, baths, square footage, lot size, and value—without spreadsheets or manual prep.
               </p>
 
-              <form onSubmit={handleLookup} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Quick property lookup</label>
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+              <form onSubmit={handleLookup} className="rounded-[20px] border border-[#E3E4EA] bg-[#F9FAFB] p-4 shadow-inner">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Quick property lookup</label>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                   <div className="flex w-full flex-col gap-1">
                     <input
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="123 Main St, City"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      className="w-full rounded-[14px] border border-[#E3E4EA] bg-white px-4 py-3 text-sm text-[#0B1220] focus:border-[#14D8FF] focus:outline-none focus:ring-2 focus:ring-[#14D8FF]/20"
                     />
                     {normalizedAddress && (
-                      <p className="text-xs text-emerald-700">Normalized: {normalizedAddress}</p>
+                      <p className="text-xs text-[#021C36]">Normalized: {normalizedAddress}</p>
                     )}
                   </div>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:opacity-60"
+                  <PIButton type="submit" disabled={loading} className="rounded-full px-5 py-3 text-sm disabled:opacity-60">
+                    {loading ? "Enriching..." : "Generate insights"}
+                  </PIButton>
+                  <PIButton
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      window.location.href = "/dashboard/jobber";
+                    }}
+                    className="rounded-full px-5 py-3 text-sm"
                   >
-                    {loading ? "Scoring..." : "Generate insights"}
-                  </button>
+                    Connect Jobber
+                  </PIButton>
                 </div>
                 {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
               </form>
 
               <StatsGrid stats={stats} />
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold text-slate-900">What am I looking at?</p>
-                <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                  <li>Scores combine livability, efficiency, and market strength. Lower risk improves the final score.</li>
-                  <li>Risk flags highlight potential issues (age, size, missing geo). Use them as a checklist on-site.</li>
-                  <li>Data sources: mock/demo providers unless connected to Zillow/RentCast; quality may vary in demo.</li>
-                  <li className="text-xs text-emerald-700">
+              <PICard className="rounded-[20px] border border-[#E3E4EA] p-5">
+                <p className="text-sm font-semibold text-[#0B1220]">What am I looking at?</p>
+                <ul className="mt-3 space-y-2 text-sm text-[#4B5563]">
+                  <li>We enrich each address with beds, baths, square footage, lot size, year built, and estimated value.</li>
+                  <li>RentCast powers the default enrichment; Zillow can be layered in when available.</li>
+                  <li>No livability scores or risk heuristics—just contractor-ready specs you can trust.</li>
+                  <li className="text-xs text-[#021C36]">
                     See docs: <a className="underline" href="/docs/known-limitations">Known limitations</a>
                   </li>
                 </ul>
-              </div>
+              </PICard>
             </div>
 
             <div className="relative">
-              <div className="absolute right-8 top-0 h-32 w-32 rounded-full bg-emerald-100 blur-3xl" />
-              <div className="absolute left-4 bottom-10 h-24 w-24 rounded-full bg-amber-100 blur-3xl" />
-              <div className="relative rounded-3xl border border-slate-100 bg-white/90 p-4 shadow-xl backdrop-blur">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Live Preview</p>
+              <PICard className="relative rounded-[24px] border border-[#E3E4EA] p-5">
+                <p className="text-xs uppercase tracking-wide text-[#6B7280]">Live Preview</p>
                 {profile ? (
-                  <div className="mt-3 space-y-3">
-                    <ScoreBadge score={profile.insights.score} label="Overall" />
-                    <div className="grid grid-cols-2 gap-3 text-sm text-slate-700">
-                      <Metric label="Valuation" tooltip="Heuristic estimate based on size/age" value={profile.insights.valuation?.estimate ? `$${profile.insights.valuation.estimate.toLocaleString()}` : "Pending"} helper="Heuristic" />
-                      <Metric label="Rent" tooltip="Estimate based on comparable size/beds" value={profile.insights.rentEstimate?.estimate ? `$${profile.insights.rentEstimate.estimate.toLocaleString()}` : "Pending"} helper="Est." />
-                      <Metric label="Livability" tooltip="Layout, beds, baths balance" value={`${Math.round(profile.insights.breakdown.livability)}/100`} helper="Space & layout" />
-                      <Metric label="Risk" tooltip="Higher means more potential issues" value={`${Math.round(profile.insights.breakdown.risk)}/100`} helper="Lower is better" />
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#6B7280]">Address</p>
+                      <p className="text-lg font-semibold text-[#021C36]">
+                        {formatAddress(profile.property.address)}
+                      </p>
                     </div>
-                    <p className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">{profile.insights.summary}</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm text-[#4B5563]">
+                      <Metric label="Beds" value={profile.property.beds ?? "—"} />
+                      <Metric label="Baths" value={profile.property.baths ?? "—"} />
+                      <Metric label="Sqft" value={profile.property.sqft?.toLocaleString() ?? "—"} />
+                      <Metric
+                        label="Lot"
+                        value={profile.property.lotSizeSqft ? `${profile.property.lotSizeSqft.toLocaleString()} sqft` : "—"}
+                      />
+                      <Metric label="Year built" value={profile.property.yearBuilt ?? "—"} />
+                      <Metric
+                        label="Estimated value"
+                        value={
+                          profile.insights.valuation?.estimate
+                            ? `$${profile.insights.valuation.estimate.toLocaleString()}`
+                            : "Pending"
+                        }
+                      />
+                    </div>
+                    <p className="rounded-[16px] bg-[#F5F5F7] p-3 text-sm text-[#4B5563]">
+                      {profile.insights.summary}
+                    </p>
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-600">Run a lookup to see instant insights.</p>
+                  <p className="mt-4 text-sm text-[#6B7280]">Run a lookup to see instant insights.</p>
                 )}
-              </div>
+              </PICard>
             </div>
           </div>
-        </div>
+        </PICard>
 
         {profile && (
           <section className="mt-10">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900">Latest Insight</h2>
-              <Link className="text-sm font-semibold text-emerald-700 hover:text-emerald-800" href="/properties">
+              <h2 className="text-xl font-semibold text-[#0B1220]">Latest Insight</h2>
+              <Link className="text-sm font-semibold text-[#021C36] hover:underline" href="/properties">
                 View all properties →
               </Link>
             </div>
@@ -192,14 +261,12 @@ export default function Home() {
   );
 }
 
-function Metric({ label, value, helper, tooltip }: { label: string; value: string; helper?: string; tooltip?: string }) {
+function Metric({ label, value, helper }: { label: string; value: string | number; helper?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <p className="text-xs uppercase tracking-wide text-slate-500">
-        {label} <InfoTooltip label={tooltip || label} />
-      </p>
-      <p className="text-lg font-semibold text-slate-900">{value}</p>
-      {helper && <p className="text-[11px] text-slate-500">{helper}</p>}
+    <div className="rounded-[14px] border border-[#E3E4EA] bg-white px-3 py-2 shadow-sm">
+      <p className="text-xs uppercase tracking-wide text-[#6B7280]">{label}</p>
+      <p className="text-lg font-semibold text-[#021C36]">{value}</p>
+      {helper && <p className="text-[11px] text-[#6B7280]">{helper}</p>}
     </div>
   );
 }

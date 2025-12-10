@@ -6,7 +6,6 @@ import { JobberConnectionMonitor } from "@/components/JobberConnectionMonitor";
 import { ManualIngestModal } from "@/components/ManualIngestModal";
 import { RebuildInsightsModal } from "@/components/RebuildInsightsModal";
 import { ProviderDiagnosticsDashboard } from "@/components/ProviderDiagnosticsDashboard";
-import { RiskFactorBreakdown } from "@/components/RiskFactorBreakdown";
 import { PropertyProvenancePanel } from "@/components/PropertyProvenancePanel";
 import { PropertyHistoryPanel } from "@/components/PropertyHistoryPanel";
 import { AddressNormalizePreview } from "@/components/AddressNormalizePreview";
@@ -30,7 +29,7 @@ export default function AdminPage() {
   const [rebuildOpen, setRebuildOpen] = useState(false);
   const [enrichResult, setEnrichResult] = useState<PropertyProfile | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [recap, setRecap] = useState<{ total?: number; highRisk?: number; lastIngest?: string | null }>({});
+  const [recap, setRecap] = useState<{ total?: number; lastIngest?: string | null }>({});
   const [platformActive, setPlatformActive] = useState<string>("jobber");
   const safeMode = process.env.NEXT_PUBLIC_SAFE_MODE === "true";
   const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -46,7 +45,7 @@ export default function AdminPage() {
     refresh();
     fetch("/api/properties")
       .then((r) => r.json())
-      .then((body) => setRecap({ total: body.data?.summary?.total, highRisk: body.data?.summary?.highRisk }))
+      .then((body) => setRecap({ total: body.data?.summary?.total }))
       .catch(() => {});
     fetch("/api/ingestion-events?limit=1")
       .then((r) => r.json())
@@ -170,10 +169,6 @@ export default function AdminPage() {
                 <span className="font-semibold">{recap.total ?? "—"}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>High-risk count</span>
-                <span className="font-semibold text-rose-700 dark:text-rose-300">{recap.highRisk ?? "—"}</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span>Last ingest</span>
                 <span className="text-xs text-slate-600 dark:text-slate-300">{recap.lastIngest ? new Date(recap.lastIngest).toLocaleString() : "Not yet"}</span>
               </div>
@@ -188,14 +183,11 @@ export default function AdminPage() {
             </div>
           </div>
           {enrichResult ? (
-            <>
-              <RiskFactorBreakdown breakdown={enrichResult.insights.breakdown} flags={enrichResult.insights.riskFlags} />
-              <PropertyHistoryPanel profile={enrichResult} />
-            </>
+            <PropertyHistoryPanel profile={enrichResult} />
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <p className="font-semibold text-slate-900 dark:text-white">Run preview</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300">Load a mock insight to view history and risk breakdown.</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">Load a mock insight to view history.</p>
             </div>
           )}
           <AddressNormalizePreview />

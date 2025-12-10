@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PropertyInsightCard } from "@/components/PropertyInsightCard";
-import { PropertyProvenancePanel } from "@/components/PropertyProvenancePanel";
-import { PropertyHistoryPanel } from "@/components/PropertyHistoryPanel";
-import { RiskFactorBreakdown } from "@/components/RiskFactorBreakdown";
-import { StaticMapPreview } from "@/components/StaticMapPreview";
 import { PhotoPlaceholder } from "@/components/PhotoPlaceholder";
-import { QuoteGenerator } from "@/components/QuoteGenerator";
+import { PropertyHeader } from "@/components/property/PropertyHeader";
+import { PropertySpecs } from "@/components/property/PropertySpecs";
+import { PropertyMap } from "@/components/property/PropertyMap";
+import { getMapSnapshot } from "@/lib/appleMaps";
 import { PropertyProfile } from "@/lib/types";
 
 async function fetchProfile(id: string): Promise<PropertyProfile | null> {
@@ -17,56 +15,94 @@ async function fetchProfile(id: string): Promise<PropertyProfile | null> {
   return body.data as PropertyProfile;
 }
 
-export default async function PropertyDetailPage({ params }: { params: { id: string } }) {
+export default async function PropertyDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const profile = await fetchProfile(params.id);
   if (!profile) return notFound();
 
-  const addressLine = [profile.property.address.line1, profile.property.address.city, profile.property.address.province].filter(Boolean).join(", ");
+  const addressLine = [
+    profile.property.address.line1,
+    profile.property.address.city,
+    profile.property.address.province,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const estimatedValue = profile.insights?.valuation?.estimate ?? undefined;
+  let lat = profile.property.address.latitude ?? undefined;
+  let lng = profile.property.address.longitude ?? undefined;
+
+  let mapImageUrl: string | null = null;
+  if (lat !== undefined && lng !== undefined) {
+    try {
+      mapImageUrl = await getMapSnapshot(lat, lng);
+    } catch (err) {
+      console.error("Map snapshot failed", err);
+    }
+  } else {
+    try {
+      const enrichRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/property/enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: addressLine }),
+        cache: "no-store",
+      });
+      if (enrichRes.ok) {
+        const body = await enrichRes.json();
+        mapImageUrl = body?.mapImageUrl ?? null;
+        const latNum = typeof body?.latitude === "number" ? body.latitude : lat;
+        const lngNum = typeof body?.longitude === "number" ? body.longitude : lng;
+        lat = latNum;
+        lng = lngNum;
+      }
+    } catch (err) {
+      console.error("Enrichment fetch for map failed", err);
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 px-6 py-10 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 px-5 py-10 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Property detail</p>
-            <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">{addressLine || "Property"}</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Enrichment provenance, history, and risk breakdown.</p>
-          </div>
+          <PropertyHeader
+            addressLine={addressLine}
+            subtitle="Specs, map preview, and estimated value."
+          />
           <div className="flex gap-2">
-            <Link href="/properties" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">← Back</Link>
-            <a href="/api/export/properties.csv" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Export CSV</a>
+            <Link
+              href="/properties"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              ← Back
+            </Link>
+            <a
+              href="/api/export/properties.csv"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              Export CSV
+            </a>
           </div>
         </div>
 
-        <QuoteGenerator propertyId={profile.property.id || ""} defaultProfile={profile.insights.serviceProfile || "cleaning"} />
-
-        <PropertyInsightCard profile={profile} />
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-3">
-            <PropertyProvenancePanel profile={profile} />
-            <RiskFactorBreakdown breakdown={profile.insights.breakdown} flags={profile.insights.riskFlags} />
-            {profile.insights.riskFlags.some((f) => f.severity === "high") && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-100">
-                <p className="text-xs font-semibold uppercase tracking-wide">Why flagged?</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                  {profile.insights.riskFlags.map((f) => (
-                    <li key={f.code}>
-                      <span className="font-semibold">{f.label}</span>{f.detail ? ` — ${f.detail}` : ""}
-                    </li>
-                  ))}
-                  <li>Scores weighted by livability, efficiency, and market strength; older homes or small lots may be penalized.</li>
-                  <li>Data caveats: provider coverage may vary; validate critical numbers before quoting.</li>
-                </ul>
-              </div>
-            )}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <PropertySpecs
+              beds={profile.property.beds ?? undefined}
+              baths={profile.property.baths ?? undefined}
+              sqft={profile.property.sqft ?? undefined}
+              lotSize={profile.property.lotSizeSqft ?? undefined}
+              yearBuilt={profile.property.yearBuilt ?? undefined}
+              estimatedValue={estimatedValue}
+            />
           </div>
-          <PropertyHistoryPanel profile={profile} />
-        </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <StaticMapPreview address={addressLine} highlight="Property" />
-          <PhotoPlaceholder />
+          <div className="space-y-4">
+            <PropertyMap mapImageUrl={mapImageUrl || undefined} lat={lat} lng={lng} />
+            <PhotoPlaceholder />
+          </div>
         </div>
       </div>
     </div>

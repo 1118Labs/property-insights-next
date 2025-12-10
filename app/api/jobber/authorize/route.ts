@@ -1,16 +1,28 @@
 // app/api/jobber/authorize/route.ts
 import { NextResponse } from "next/server";
 
+const SCOPES = ["clients.read", "properties.read", "jobs.read", "requests.read"];
+
 export async function GET() {
-  const clientId = process.env.JOBBER_CLIENT_ID!;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/jobber/callback`;
-  const scopes = "clients.read%20properties.read%20jobs.read";
+  const clientId = process.env.JOBBER_CLIENT_ID;
+  const redirectUri = process.env.JOBBER_REDIRECT_URI;
+  const authUrl = process.env.JOBBER_AUTH_URL;
 
-  const url =
-    `https://api.getjobber.com/api/oauth/authorize?response_type=code` +
-    `&client_id=${clientId}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&scope=${scopes}`;
+  if (!clientId || !redirectUri) {
+    return NextResponse.json(
+      {
+        error: "config_error",
+        message: "Missing JOBBER_CLIENT_ID or JOBBER_REDIRECT_URI",
+      },
+      { status: 500 }
+    );
+  }
 
-  return NextResponse.redirect(url);
+  const url = new URL(authUrl || "https://api.getjobber.com/api/oauth/authorize");
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", SCOPES.join(" "));
+
+  return NextResponse.redirect(url.toString());
 }
