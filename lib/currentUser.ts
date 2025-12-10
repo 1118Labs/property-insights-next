@@ -26,25 +26,23 @@ function parseSessionCookie(raw: string | undefined | null): CurrentUser {
   }
 }
 
-export async function getCurrentUserFromRequest(req: Request): Promise<CurrentUser> {
-  if (!isAuthEnabled()) {
-    return { email: "dev@local", role: "owner" };
-  }
-  const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${COOKIE_NAME}=`));
-
-  if (!match) return null;
-  const raw = decodeURIComponent(match.split("=").slice(1).join("="));
-  return parseSessionCookie(raw);
+/**
+ * DEPRECATED — now just proxies to getCurrentUserFromHeaders()
+ * because server components should rely on Next.js cookies().
+ */
+export async function getCurrentUserFromRequest(_: Request): Promise<CurrentUser> {
+  return getCurrentUserFromHeaders();
 }
 
+/**
+ * Primary authentication helper for all server components.
+ * Reads the cookie directly from the Next.js headers() API.
+ */
 export async function getCurrentUserFromHeaders(): Promise<CurrentUser> {
   if (!isAuthEnabled()) {
     return { email: "dev@local", role: "owner" };
   }
+
   const raw = cookies().get(COOKIE_NAME)?.value;
   return parseSessionCookie(raw ?? null);
 }
