@@ -1,132 +1,82 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
-import Hint from "@/components/onboarding/Hint";
-import { isDemoModeEnabled, isOnboardingHintsEnabled } from "@/lib/featureFlags";
-import Image from "next/image";
-import PIButton from "@/components/ui/PIButton";
-import PICard from "@/components/ui/PICard";
-import StatusPill from "@/components/ui/StatusPill";
+import { useState, useEffect, useMemo } from "react";
 
 type JobberStatus = {
   connected: boolean;
-  jobber_account_id?: string;
-  error?: string;
+  lastSync: string | null;
+  lastError: string | null;
 };
 
 async function fetchJobberStatus(): Promise<JobberStatus> {
-  const res = await fetch("/api/jobber/status", { cache: "no-store" });
-  return (await res.json()) as JobberStatus;
+  const res = await fetch("/api/jobber/status");
+  if (!res.ok) {
+    throw new Error("Failed to fetch Jobber status");
+  }
+  return res.json();
 }
 
-export default function JobberConnectPage() {
-  const hintsEnabled = isOnboardingHintsEnabled();
-  const demoMode = isDemoModeEnabled();
+export default function JobberStatusPage() {
   const [lastChecked, setLastChecked] = useState<number | null>(null);
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery<JobberStatus>({
+  // ❌ old (invalid)
+  // useQuery({ queryKey, queryFn, onSuccess })
+
+  // ✅ v5-compliant
+  const query = useQuery({
     queryKey: ["jobber-status"],
     queryFn: fetchJobberStatus,
-    onSuccess: () => setLastChecked(Date.now()),
   });
 
+  // v5 requires success side-effects inside useEffect
+  useEffect(() => {
+    if (query.isSuccess) {
+      setLastChecked(Date.now());
+    }
+  }, [query.isSuccess]);
+
   const statusState = useMemo(() => {
-    if (isLoading) return "loading";
-    if (data?.connected) return "connected";
-    return "disconnected";
-  }, [data?.connected, isLoading]);
-
-  const accountLabel = data?.jobber_account_id
-    ? `${data.jobber_account_id.slice(0, 6)}…`
-    : null;
-
-  const connect = () => {
-    window.location.href = "/api/jobber/authorize";
-  };
+    if (query.isLoading) return "loading";
+    if (query.isError) return "error";
+    if (!query.data?.connected) return "disconnected";
+    return "connected";
+  }, [query.data, query.isLoading, query.isError]);
 
   return (
-    <div className="relative min-h-screen bg-white text-slate-900">
-      <div className="relative flex">
-        <Sidebar />
-        <main className="flex-1">
-          <TopBar
-            title="Jobber Integration"
-            userName="Ops Team"
-            lastSync={
-              isFetching
-                ? "Refreshing Jobber status…"
-                : lastChecked
-                ? `Last checked ${new Date(lastChecked).toLocaleTimeString()}`
-                : "Last sync just now"
-            }
-            showJobberStatus
-            subtitle="Connect Jobber once and keep requests flowing into Property Insights."
-          />
-          <div className="mx-auto max-w-3xl space-y-6 px-6 py-10">
-            <Image
-              src="/brand/pi-logo.png"
-              alt="Property Insights Logo"
-              width={42}
-              height={42}
-              className="h-8 w-auto opacity-90"
-            />
+    <div className="p-6 text-white">
+      <h1 className="text-3xl font-bold mb-4">Jobber Connection</h1>
 
-            {hintsEnabled && demoMode && (
-              <Hint
-                title="Demo mode active"
-                body="You are in demo mode. Connect Jobber in a live environment to sync real data."
-              />
-            )}
+      {statusState === "loading" && <p>Checking Jobber status…</p>}
+      {statusState === "error" && (
+        <p className="text-red-400">
+          Failed to load Jobber status: {String(query.error)}
+        </p>
+      )}
 
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-slate-900">Jobber Integration</h1>
-              <p className="text-sm text-slate-600 max-w-md">
-                Connect once and keep requests flowing into Property Insights with automatic enrichment.
-              </p>
-            </div>
+      {statusState === "connected" && (
+        <div className="space-y-2">
+          <p className="text-green-400">Connected</p>
+          <p>
+            Last synchronized:{" "}
+            {query.data?.lastSync
+              ? new Date(query.data.lastSync).toLocaleString()
+              : "Never"}
+          </p>
+        </div>
+      )}
 
-            <PICard className="space-y-4">
-              <div className="flex items-center justify-between">
-                <StatusPill
-                  status={statusState as "loading" | "connected" | "disconnected"}
-                  label={
-                    statusState === "loading"
-                      ? "Checking Jobber…"
-                      : statusState === "connected"
-                      ? "Jobber connected"
-                      : "Jobber not connected"
-                  }
-                />
-                {lastChecked && (
-                  <div className="text-xs text-slate-500">Last checked {new Date(lastChecked).toLocaleTimeString()}</div>
-                )}
-              </div>
-              {accountLabel && (
-                <div className="text-sm text-slate-700">
-                  Account ID: <span className="font-mono text-slate-900">{accountLabel}</span>
-                </div>
-              )}
-              {isError && data?.error && (
-                <div className="text-sm text-red-600">Error: {data.error}</div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <PIButton type="button" onClick={connect}>
-                  {statusState === "connected" ? "Reconnect Jobber" : "Connect Jobber"}
-                </PIButton>
-                <PIButton variant="secondary" type="button" onClick={() => refetch()}>
-                  Test sync
-                </PIButton>
-                <PIButton variant="tertiary" href="/admin/property-test">
-                  Open Dev Console
-                </PIButton>
-              </div>
-            </PICard>
-          </div>
-        </main>
-      </div>
+      {statusState === "disconnected" && (
+        <p className="text-yellow-400">
+          Not connected to Jobber — go to Settings.
+        </p>
+      )}
+
+      {lastChecked && (
+        <p className="text-xs text-white/50 mt-4">
+          Last checked: {new Date(lastChecked).toLocaleTimeString()}
+        </p>
+      )}
     </div>
   );
 }
