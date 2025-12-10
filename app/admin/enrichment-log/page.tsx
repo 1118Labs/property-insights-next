@@ -1,4 +1,6 @@
 import { requireAdminClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { getCurrentUserFromRequest } from "@/lib/currentUser";
 
 type EnrichmentLogRow = {
   id: string;
@@ -14,13 +16,14 @@ type EnrichmentLogRow = {
   refreshed_at: string | null;
 };
 
-import { headers } from "next/headers";
-import { getCurrentUserFromRequest } from "@/lib/currentUser";
-
 export default async function EnrichmentLogPage() {
-  const user = await getCurrentUserFromRequest(
-    new Request("http://local", { headers: headers() })
-  );
+  // FIX: convert Next.js headers() result into a HeadersInit-compatible object
+  const h = await headers();
+  const req = new Request("http://local", {
+    headers: Object.fromEntries(h.entries()),
+  });
+
+  const user = await getCurrentUserFromRequest(req);
 
   if (!user || user.role !== "owner") {
     return (
