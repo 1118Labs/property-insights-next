@@ -1,8 +1,11 @@
-// force-netlify-full-rebuild
-import type { NextConfig } from "next";
+import { withNetlify } from "@netlify/next";
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const nextConfig = {
+  reactStrictMode: true,
+  experimental: {
+    serverActions: true,
+    appDir: true,
+  },
 };
 
-export default nextConfig;
+export default withNetlify(nextConfig);

@@ -4,6 +4,8 @@ import ClientInsightCard from "@/components/ClientInsightCard";
 import { ClientQuoteView } from "@/components/ClientQuoteView";
 import { PropertyProfile } from "@/lib/types";
 
+export const DEMO_TOKEN_PREFIX = "demo-";
+
 async function fetchSession(token: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/portal/verify?token=${token}`, { cache: "no-store" });
   if (!res.ok) return null;
@@ -25,8 +27,35 @@ async function fetchQuote(quoteId?: string | null) {
   return body.data;
 }
 
-export default async function PortalPage({ params }: { params: { token: string } }) {
-  const sessionRes = await fetchSession(params.token);
+export default async function PortalPage(props: { params: Promise<{ token: string }> }) {
+  const resolved = await props.params;
+  const token = resolved.token;
+
+  // Safety check: if no token, return 404
+  if (!token) {
+    return <div>Missing token</div>;
+  }
+
+  // Support demo preview tokens such as "demo-preview-token-123"
+  if (token.startsWith(DEMO_TOKEN_PREFIX)) {
+    return (
+      <ClientPortalLayout>
+        <div className="space-y-3">
+          <h1 className="text-xl font-semibold">Demo Preview</h1>
+          <p>This is a demo portal preview for token: {token}</p>
+        </div>
+      </ClientPortalLayout>
+    );
+  }
+
+  // ORIGINAL PORTAL LOGIC BELOW — leave untouched
+  // ------------------------------------------------
+  // Load the real client or property portal content
+  return <RealPortalPage token={token} />;
+}
+
+async function RealPortalPage({ token }: { token: string }) {
+  const sessionRes = await fetchSession(token);
   if (!sessionRes?.data) return notFound();
   const session = sessionRes.data;
   const profile = await fetchProfile(session.propertyId);

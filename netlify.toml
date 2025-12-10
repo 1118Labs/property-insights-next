@@ -2,28 +2,17 @@
   command = "npm run build"
   publish = ".next"
 
-[functions]
-  node_bundler = "esbuild"
+[[redirects]]
+  from = "/portal/:token"
+  to = "/.netlify/functions/next"
+  status = 200
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+[[redirects]]
+  from = "/portal/*"
+  to = "/.netlify/functions/next"
+  status = 200
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Content-Security-Policy = """
-      default-src 'self';
-      img-src 'self' data:;
-      script-src 'self' 'unsafe-inline';
-      style-src 'self' 'unsafe-inline';
-      connect-src *;
-      frame-src *;
-      object-src 'none';
-    """
-
-[[headers]]
-  for = "/api/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "*"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/next"
+  status = 200
