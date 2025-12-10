@@ -1,4 +1,5 @@
-import React from "react";
+import { formatAddress } from "@/lib/utils/address";
+import { PropertyProfile } from "@/lib/types";
 
 type StatProps = {
   label: string;
@@ -18,20 +19,19 @@ function Stat({ label, value }: StatProps) {
   );
 }
 
-export default function ClientInsightCard({ property }: any) {
+export default function ClientInsightCard({ profile }: { profile: PropertyProfile }) {
+  const property = profile.property;
+
   const beds = property.beds != null ? String(property.beds) : "–";
   const baths = property.baths != null ? String(property.baths) : "–";
-  const sqft =
-    typeof property.sqft === "number"
-      ? property.sqft.toLocaleString()
-      : "–";
-  const year =
-    property.yearBuilt != null ? String(property.yearBuilt) : "–";
+  const sqft = typeof property.sqft === "number" ? property.sqft.toLocaleString() : "–";
+  const year = property.yearBuilt != null ? String(property.yearBuilt) : "–";
+  const address = property.address ? formatAddress(property.address) : "–";
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="text-lg font-semibold text-slate-900 dark:text-white">
-        {property.address}
+        {address}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700 dark:text-slate-200 sm:grid-cols-4">

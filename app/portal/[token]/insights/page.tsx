@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ClientPortalLayout } from "@/components/ClientPortalLayout";
-import { ClientInsightCard } from "@/components/ClientInsightCard";
+import ClientInsightCard from "@/components/ClientInsightCard";
 import { PropertyProfile } from "@/lib/types";
 
 async function fetchSession(token: string) {

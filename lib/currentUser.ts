@@ -43,6 +43,7 @@ export async function getCurrentUserFromHeaders(): Promise<CurrentUser> {
     return { email: "dev@local", role: "owner" };
   }
 
-  const raw = cookies().get(COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(COOKIE_NAME)?.value;
   return parseSessionCookie(raw ?? null);
 }

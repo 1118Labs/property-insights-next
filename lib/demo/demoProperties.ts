@@ -1,4 +1,17 @@
-import { RentcastEnrichment } from "@/app/api/jobber/requests/route";
+export type RentcastEnrichment = {
+  provider: "rentcast";
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  lotSizeSqft?: number;
+  yearBuilt?: number;
+  propertyType?: string;
+  estRent?: number;
+  estValue?: number;
+  latitude?: number;
+  longitude?: number;
+  mapImageUrl?: string | null;
+};
 
 export const demoProperties: Record<string, RentcastEnrichment> = {
   "demo-req-1": {

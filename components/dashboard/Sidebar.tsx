@@ -14,7 +14,15 @@ import { usePathname } from "next/navigation";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { useEffect, useState } from "react";
 
-const navItems = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: typeof Squares2X2Icon;
+  flag?: string;
+  admin?: boolean;
+};
+
+const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: Squares2X2Icon },
   { label: "Requests", href: "/dashboard/requests", icon: EnvelopeOpenIcon },
   { label: "Jobs", href: "/jobs", icon: BriefcaseIcon },
