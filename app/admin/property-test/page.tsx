@@ -8,6 +8,7 @@ export default function PropertyTestPage() {
   const [loading, setLoading] = useState(false);
   const [rawBody, setRawBody] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
+  const [portalLink, setPortalLink] = useState<string>('');
 
   const handleConnectJobber = () => {
     window.location.href = '/api/jobber/authorize';
@@ -42,6 +43,21 @@ export default function PropertyTestPage() {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGeneratePortalLink = async () => {
+    setPortalLink('');
+    try {
+      const res = await fetch('/api/dev/generate-portal-link');
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || 'Failed to generate link.');
+      }
+      setPortalLink(data.url);
+    } catch (err) {
+      console.error('Error generating portal link:', err);
+      setPortalLink('Error generating link.');
     }
   };
 
@@ -84,6 +100,14 @@ export default function PropertyTestPage() {
             >
               {loading ? 'Loading Requests…' : 'Fetch Jobber Requests (raw)'}
             </PIButton>
+
+            <PIButton
+              type="button"
+              onClick={handleGeneratePortalLink}
+              variant="secondary"
+            >
+              Generate Test Portal Link
+            </PIButton>
           </div>
 
           {error && (
@@ -108,6 +132,20 @@ export default function PropertyTestPage() {
               Use the controls above to connect and fetch raw data. This view is intentionally
               barebones for debugging.
             </p>
+          )}
+
+          {portalLink && (
+            <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+              <p className="font-semibold">Portal Test Link</p>
+              <a
+                href={portalLink}
+                className="text-[#0A84FF] underline font-medium break-all"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {portalLink}
+              </a>
+            </div>
           )}
         </div>
       </div>
