@@ -2,17 +2,5 @@
   command = "npm run build"
   publish = ".next"
 
-[[redirects]]
-  from = "/portal/:token"
-  to = "/.netlify/functions/next"
-  status = 200
-
-[[redirects]]
-  from = "/portal/*"
-  to = "/.netlify/functions/next"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/next"
-  status = 200
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
