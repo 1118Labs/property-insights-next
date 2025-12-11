@@ -17,23 +17,47 @@ const supabaseAdmin = createClient(
   }
 );
 
-// NOTE: this query ONLY uses scalar fields that are 100% present on `Request`
-// from the docs you pasted. No `orderBy`, no `status` field, no bare `address`.
 const GET_REQUESTS_QUERY = /* GraphQL */ `
-  query GetRequests($first: Int = 50) {
-    requests(first: $first) {
+  query GetRequests {
+    requests(first: 50) {
       nodes {
         id
         title
         requestStatus
         source
-        companyName
-        contactName
-        email
-        phone
-        jobberWebUri
         createdAt
-        updatedAt
+
+        client {
+          id
+          firstName
+          lastName
+          emails {
+            address
+          }
+          phones {
+            number
+          }
+        }
+
+        property {
+          id
+          address {
+            address
+            city
+            province
+            postalCode
+            country
+          }
+        }
+
+        jobs(first: 10) {
+          nodes {
+            id
+            jobStatus
+            title
+            createdAt
+          }
+        }
       }
     }
   }
@@ -43,14 +67,33 @@ type JobberRequestNode = {
   id: string;
   title?: string | null;
   requestStatus: string;
-  source: string;
-  companyName?: string | null;
-  contactName?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  jobberWebUri: string;
+  source?: string | null;
   createdAt: string;
-  updatedAt: string;
+  client?: {
+    id?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    emails?: Array<{ address?: string | null }> | null;
+    phones?: Array<{ number?: string | null }> | null;
+  } | null;
+  property?: {
+    id?: string | null;
+    address?: {
+      address?: string | null;
+      city?: string | null;
+      province?: string | null;
+      postalCode?: string | null;
+      country?: string | null;
+    } | null;
+  } | null;
+  jobs?: {
+    nodes?: Array<{
+      id?: string | null;
+      jobStatus?: string | null;
+      title?: string | null;
+      createdAt?: string | null;
+    }>;
+  } | null;
 };
 
 type JobberGraphQLError = {
@@ -121,7 +164,6 @@ export async function GET() {
       },
       body: JSON.stringify({
         query: GET_REQUESTS_QUERY,
-        variables: { first: 50 },
       }),
     });
 
@@ -153,14 +195,37 @@ export async function GET() {
       id: r.id,
       title: r.title ?? null,
       status: r.requestStatus,
-      source: r.source,
-      companyName: r.companyName ?? null,
-      contactName: r.contactName ?? null,
-      email: r.email ?? null,
-      phone: r.phone ?? null,
-      jobberWebUri: r.jobberWebUri,
+      source: r.source ?? null,
       createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
+      client: r.client
+        ? {
+            id: r.client.id ?? null,
+            firstName: r.client.firstName ?? null,
+            lastName: r.client.lastName ?? null,
+            emails: r.client.emails ?? [],
+            phones: r.client.phones ?? [],
+          }
+        : null,
+      property: r.property
+        ? {
+            id: r.property.id ?? null,
+            address: {
+              address: r.property.address?.address ?? null,
+              city: r.property.address?.city ?? null,
+              province: r.property.address?.province ?? null,
+              postalCode: r.property.address?.postalCode ?? null,
+              country: r.property.address?.country ?? null,
+            },
+          }
+        : null,
+      jobs:
+        r.jobs?.nodes?.map((job) => ({
+          id: job?.id ?? null,
+          title: job?.title ?? null,
+          status: job?.jobStatus ?? null,
+          createdAt: job?.createdAt ?? null,
+        })) ?? [],
+      raw: r,
     }));
 
     return NextResponse.json({
