@@ -9,7 +9,7 @@ import { getCurrentUserFromRequest } from "@/lib/currentUser";
 import { isDemoModeEnabled } from "@/lib/featureFlags";
 import { demoProperties } from "@/lib/demo/demoProperties";
 import { demoRequests } from "@/lib/demo/demoRequests";
-import { normalizeAddress, formatAddress } from "@/lib/utils/address";
+import { normalizeAddress } from "@/lib/utils/address";
 import { requireAdminClient, supabaseEnabled } from "@/lib/supabase/server";
 import { JOBBER_GRAPHQL_API_VERSION } from "@/lib/jobber";
 
@@ -65,34 +65,25 @@ export type RequestItem = {
   raw: Record<string, unknown> | null;
 };
 
-type JobberRequestAddressPayload = {
-  street?: string;
-  city?: string;
-  province?: string;
-  postalCode?: string;
-  country?: string;
-  full?: string;
-};
-
 type JobberRequestNode = {
   id?: string;
-  createdAt?: string;
-  status?: string;
   title?: string;
-  description?: string;
-  url?: string | null;
-  client?: {
-    name?: string;
-    address?: JobberRequestAddressPayload | null;
-  } | null;
-  property?: {
-    address?: JobberRequestAddressPayload | null;
-  } | null;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  requestStatus?: string;
+  companyName?: string;
+  source?: string;
+  jobberWebUri?: string;
+  client?: { id?: string; name?: string | null } | null;
+  property?: { id?: string; address?: string | null } | null;
 };
 
 type JobberRequestEdge = { node?: JobberRequestNode | null };
 type JobberGraphResponse = {
-  data?: { requests?: { edges?: JobberRequestEdge[] } };
+  data?: { requests?: { edges?: JobberRequestEdge[]; nodes?: JobberRequestNode[] } };
   errors?: unknown;
 };
 
@@ -124,70 +115,29 @@ const MOCK_MODE = (process.env.MOCK_JOBBER_REQUESTS || "").toLowerCase() === "tr
 const ENRICH_CHUNK = 5;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-function buildAddressString(node: JobberRequestNode): { address: RequestAddress; addressString: string } {
-  const propertyAddress = node.property?.address || {};
-  const clientAddress = node.client?.address || {};
-  const raw = propertyAddress.full || clientAddress.full;
-  const normalized = normalizeAddress({
-    line1: propertyAddress.street || clientAddress.street || raw || "",
-    city: propertyAddress.city || clientAddress.city || undefined,
-    province: propertyAddress.province || clientAddress.province || undefined,
-    postalCode: propertyAddress.postalCode || clientAddress.postalCode || undefined,
-    country: propertyAddress.country || clientAddress.country || undefined,
-  });
-  const address: RequestAddress = {
-    line1: normalized.line1 || undefined,
-    city: normalized.city || undefined,
-    state: normalized.province || undefined,
-    postalCode: normalized.postalCode || undefined,
-    country: normalized.country || undefined,
-  };
-  const addressString =
-    raw ||
-    formatAddress({
-      line1: normalized.line1,
-      line2: normalized.line2,
-      city: normalized.city,
-      province: normalized.province,
-      postalCode: normalized.postalCode,
-      country: normalized.country,
-      latitude: normalized.latitude,
-      longitude: normalized.longitude,
-    });
-  return { address, addressString };
-}
-
 async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountId: string): Promise<RequestItem[]> {
   const query = `
-    query Requests($first: Int!) {
-      requests(first: $first, orderBy: { field: CREATED_AT, direction: DESC }) {
-        edges {
-          node {
+    query GetRequests {
+      requests(first: 50) {
+        nodes {
+          id
+          title
+          contactName
+          email
+          phone
+          createdAt
+          updatedAt
+          requestStatus
+          companyName
+          source
+          jobberWebUri
+          client {
             id
-            createdAt
-            status
-            title
-            description
-            url
-            client {
-              name
-              address {
-                street
-                city
-                province
-                postalCode
-                country
-              }
-            }
-            property {
-              address {
-                street
-                city
-                province
-                postalCode
-                country
-              }
-            }
+            name
+          }
+          property {
+            id
+            address
           }
         }
       }
@@ -203,8 +153,7 @@ async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountI
     },
     body: JSON.stringify({
       query,
-      operationName: "Requests",
-      variables: { first: 20 },
+      operationName: "GetRequests",
     }),
   });
 
@@ -229,20 +178,31 @@ async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountI
     throw error;
   }
 
-  const edges = graphJson?.data?.requests?.edges ?? [];
+  const nodes = graphJson?.data?.requests?.nodes ?? [];
 
-  return edges.map((edge) => {
-    const node: JobberRequestNode = edge?.node ?? {};
-    const { address, addressString } = buildAddressString(node);
+  return nodes.map((node) => {
+    const addressString =
+      typeof node?.property?.address === "string" ? node.property.address : "";
+    const normalized = normalizeAddress({
+      line1: addressString || "",
+    });
+    const address: RequestAddress = {
+      line1: normalized.line1 || addressString || undefined,
+      city: normalized.city || undefined,
+      state: normalized.province || undefined,
+      postalCode: normalized.postalCode || undefined,
+      country: normalized.country || undefined,
+    };
 
     return {
-      id: node.id ?? "",
-      jobberRequestId: node.id ?? "",
+      id: node?.id ?? "",
+      jobberRequestId: node?.id ?? "",
       jobberAccountId: jobberAccountId ?? "unknown",
-      status: node.status ?? "",
-      createdAt: node.createdAt ?? "",
-      title: node.title ?? "",
-      contactName: node.client?.name ?? undefined,
+      status: node?.requestStatus ?? "",
+      createdAt: node?.createdAt ?? "",
+      updatedAt: node?.updatedAt ?? undefined,
+      title: node?.title ?? "",
+      contactName: node?.contactName ?? node?.client?.name ?? undefined,
       address,
       addressString,
       enrichment: null,
@@ -250,7 +210,7 @@ async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountI
       mapImageUrl: null,
       estimatedValue: null,
       property: {
-        raw: node.property ?? null,
+        raw: node?.property ?? null,
       },
       raw: node as Record<string, unknown>,
     };
