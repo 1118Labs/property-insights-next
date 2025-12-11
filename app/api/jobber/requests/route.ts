@@ -190,11 +190,11 @@ export async function GET() {
 
     const nodes = json.data?.requests?.nodes ?? [];
 
-    // Normalized shape for the UI. We keep names simple and stable.
+    // Normalized shape for the UI. Only include the requested fields.
     const requests = nodes.map((r) => ({
       id: r.id,
       title: r.title ?? null,
-      status: r.requestStatus,
+      requestStatus: r.requestStatus,
       source: r.source ?? null,
       createdAt: r.createdAt,
       client: r.client
@@ -221,11 +221,10 @@ export async function GET() {
       jobs:
         r.jobs?.nodes?.map((job) => ({
           id: job?.id ?? null,
+          jobStatus: job?.jobStatus ?? null,
           title: job?.title ?? null,
-          status: job?.jobStatus ?? null,
           createdAt: job?.createdAt ?? null,
         })) ?? [],
-      raw: r,
     }));
 
     return NextResponse.json({
