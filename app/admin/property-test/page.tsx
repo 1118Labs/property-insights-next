@@ -25,18 +25,20 @@ export default function PropertyTestPage() {
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         data?: unknown;
-        error?: { message?: string; code?: string; status?: number } | null;
+        error?: { message?: string; code?: string; status?: number } | string | null;
         message?: string;
       };
       setRawBody(body);
 
       if (!res.ok || body?.ok === false) {
-        const errMessage =
-          body?.error?.message ||
-          body?.message ||
-          body?.error ||
-          `Request failed with status ${res.status}`;
-        throw new Error(errMessage);
+        const rawError = body?.error;
+        const normalizedMessage: string =
+          typeof rawError === 'string'
+            ? rawError
+            : rawError?.message ||
+              body?.message ||
+              `Request failed with status ${res.status}`;
+        throw new Error(normalizedMessage);
       }
     } catch (err) {
       console.error('Error fetching Jobber requests:', err);
