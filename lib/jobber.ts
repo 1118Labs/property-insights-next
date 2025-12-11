@@ -438,7 +438,7 @@ export async function fetchRecentJobberRequests(
 ) {
   const query = `
     query RecentRequests($first: Int!) {
-      requests(first: $first, orderBy: { field: CREATED_AT, direction: DESC }) {
+      requests(first: $first) {
         edges {
           node {
             id
