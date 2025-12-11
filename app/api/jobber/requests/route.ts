@@ -1,5 +1,5 @@
 // app/api/jobber/requests/route.ts
-// Jobber Requests → Property Enrichment → Dashboard pipeline.
+// Fetches Jobber requests, normalizes them, enriches properties, and returns dashboard-ready rows.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAnyJobberAccessToken, getJobberAccessTokenForAccount } from "@/lib/jobberTokens";
@@ -95,6 +95,30 @@ type JobberGraphResponse = {
   errors?: unknown;
 };
 
+function formatJobberGraphqlError(status: number, raw: string) {
+  let message: string | undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.errors) && parsed.errors.length) {
+      const first = parsed.errors[0];
+      message =
+        first?.message ||
+        (typeof first === "string" ? first : undefined);
+    } else if (parsed?.error) {
+      message = parsed.error;
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  const snippet = (message || raw || "")
+    .toString()
+    .replace(/\s+/g, " ")
+    .slice(0, 200);
+
+  return `Jobber GraphQL error (${status}): ${snippet || "unknown error"}`;
+}
+
 const MOCK_MODE = (process.env.MOCK_JOBBER_REQUESTS || "").toLowerCase() === "true";
 const ENRICH_CHUNK = 5;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -189,11 +213,19 @@ async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountI
     graphJson = JSON.parse(graphText) as JobberGraphResponse;
   } catch (err) {
     console.error("Failed to parse Jobber GraphQL response", err);
-    throw new Error("Jobber GraphQL did not return valid JSON.");
+    const error = new Error(
+      formatJobberGraphqlError(graphRes.status, graphText)
+    );
+    (error as any).status = graphRes.status;
+    throw error;
   }
 
   if (!graphRes.ok || graphJson.errors) {
-    throw new Error("Jobber GraphQL returned an error.");
+    const error = new Error(
+      formatJobberGraphqlError(graphRes.status, graphText)
+    );
+    (error as any).status = graphRes.status;
+    throw error;
   }
 
   const edges = graphJson?.data?.requests?.edges ?? [];

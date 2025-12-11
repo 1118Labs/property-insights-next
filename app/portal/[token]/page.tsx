@@ -3,6 +3,8 @@ import { ClientPortalLayout } from "@/components/ClientPortalLayout";
 import ClientInsightCard from "@/components/ClientInsightCard";
 import { ClientQuoteView } from "@/components/ClientQuoteView";
 import { PropertyProfile } from "@/lib/types";
+import { formatAddress } from "@/lib/utils/address";
+import { PortalHero } from "@/components/portal/PortalHero";
 
 export const DEMO_TOKEN_PREFIX = "demo-";
 
@@ -40,10 +42,7 @@ export default async function PortalPage(props: { params: Promise<{ token: strin
   if (token.startsWith(DEMO_TOKEN_PREFIX)) {
     return (
       <ClientPortalLayout>
-        <div className="space-y-3">
-          <h1 className="text-xl font-semibold">Demo Preview</h1>
-          <p>This is a demo portal preview for token: {token}</p>
-        </div>
+        <PortalHero title="Demo Preview" subtitle={`This is a demo portal preview for: ${token}`} />
       </ClientPortalLayout>
     );
   }
@@ -61,10 +60,12 @@ async function RealPortalPage({ token }: { token: string }) {
   const profile = await fetchProfile(session.propertyId);
   if (!profile) return notFound();
   const quote = await fetchQuote(session.quoteId);
+  const address = formatAddress(profile.property.address);
 
   return (
     <ClientPortalLayout>
-      <div className="space-y-3">
+      <PortalHero title="Your Property Insights" subtitle={`Confidential link for: ${address}`} />
+      <div className="space-y-4">
         <ClientInsightCard profile={profile} />
         <ClientQuoteView quote={quote} />
       </div>

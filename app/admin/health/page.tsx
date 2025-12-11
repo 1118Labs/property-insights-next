@@ -15,12 +15,22 @@ type Health = {
 
 export default function AdminHealthPage() {
   const [health, setHealth] = useState<Health | null>(null);
+  const [jobberPing, setJobberPing] = useState<"loading" | "ok" | "fail">(
+    "loading"
+  );
 
   useEffect(() => {
     fetch("/api/health")
       .then((res) => res.json())
       .then((body) => setHealth(body))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/jobber/dev/ping")
+      .then((res) => res.json())
+      .then((body) => setJobberPing(body?.ok ? "ok" : "fail"))
+      .catch(() => setJobberPing("fail"));
   }, []);
 
   return (
@@ -34,6 +44,18 @@ export default function AdminHealthPage() {
           detail={health.jobber?.daysRemaining !== undefined ? `Token days: ${health.jobber?.daysRemaining ?? "n/a"}` : undefined}
         />
       )}
+      <div className="text-xs text-slate-600">
+        Jobber dev ping:{" "}
+        {jobberPing === "ok" ? (
+          <span className="text-green-600">OK</span>
+        ) : jobberPing === "fail" ? (
+          <span className="text-red-600">
+            Failed – see Dev Shell for details
+          </span>
+        ) : (
+          <span className="text-slate-500">Checking…</span>
+        )}
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Webhook simulator</p>

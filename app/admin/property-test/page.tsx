@@ -20,23 +20,23 @@ export default function PropertyTestPage() {
     setRawBody(null);
 
     try {
-      const res = await fetch('/api/jobber/requests');
+      const res = await fetch('/api/jobber/dev/ping');
 
       const body = (await res.json().catch(() => ({}))) as {
-        requests?: unknown;
-        error?: string;
+        ok?: boolean;
+        data?: unknown;
+        error?: { message?: string; code?: string; status?: number } | null;
         message?: string;
       };
       setRawBody(body);
 
-      if (!res.ok) {
-        if (body?.error === 'missing_token') {
-          throw new Error('No Jobber connection found. Click Connect Jobber first.');
-        }
-        if (body?.error === 'callback_failed' || body?.error === 'token_resolution_failed') {
-          throw new Error(body?.message || 'Jobber OAuth/token handling failed.');
-        }
-        throw new Error(body?.message || body?.error || `Request failed with status ${res.status}`);
+      if (!res.ok || body?.ok === false) {
+        const errMessage =
+          body?.error?.message ||
+          body?.message ||
+          body?.error ||
+          `Request failed with status ${res.status}`;
+        throw new Error(errMessage);
       }
     } catch (err) {
       console.error('Error fetching Jobber requests:', err);
@@ -98,7 +98,7 @@ export default function PropertyTestPage() {
               variant="secondary"
               className="disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? 'Loading Requests…' : 'Fetch Jobber Requests (raw)'}
+              {loading ? 'Pinging Jobber…' : 'Fetch Jobber Requests (raw)'}
             </PIButton>
 
             <PIButton

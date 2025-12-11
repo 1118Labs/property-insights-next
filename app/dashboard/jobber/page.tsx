@@ -44,39 +44,62 @@ export default function JobberStatusPage() {
   }, [query.data, query.isLoading, query.isError]);
 
   return (
-    <div className="p-6 text-white">
-      <h1 className="text-3xl font-bold mb-4">Jobber Connection</h1>
-
-      {statusState === "loading" && <p>Checking Jobber status…</p>}
-      {statusState === "error" && (
-        <p className="text-red-400">
-          Failed to load Jobber status: {String(query.error)}
-        </p>
-      )}
-
-      {statusState === "connected" && (
-        <div className="space-y-2">
-          <p className="text-green-400">Connected</p>
-          <p>
-            Last synchronized:{" "}
-            {query.data?.lastSync
-              ? new Date(query.data.lastSync).toLocaleString()
-              : "Never"}
-          </p>
+    <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500">Integration</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Jobber Connection</h1>
+            <p className="text-sm text-gray-600">Monitor connection health, status, and sync activity.</p>
+          </div>
+          <div className="text-xs text-gray-500">
+            {lastChecked ? `Last checked: ${new Date(lastChecked).toLocaleTimeString()}` : ""}
+          </div>
         </div>
-      )}
 
-      {statusState === "disconnected" && (
-        <p className="text-yellow-400">
-          Not connected to Jobber — go to Settings.
-        </p>
-      )}
+        <div className="mt-4 space-y-3 text-sm text-gray-700">
+          {statusState === "loading" && <p>Checking Jobber status…</p>}
+          {statusState === "error" && (
+            <p className="text-red-500">
+              Failed to load Jobber status: {String(query.error)}
+            </p>
+          )}
 
-      {lastChecked && (
-        <p className="text-xs text-white/50 mt-4">
-          Last checked: {new Date(lastChecked).toLocaleTimeString()}
-        </p>
-      )}
-    </div>
+          {statusState === "connected" && (
+            <div className="space-y-1 rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-green-800">
+              <p className="font-semibold">Connected</p>
+              <p>
+                Last synchronized:{" "}
+                {query.data?.lastSync
+                  ? new Date(query.data.lastSync).toLocaleString()
+                  : "Never"}
+              </p>
+            </div>
+          )}
+
+          {statusState === "disconnected" && (
+            <div className="space-y-1 rounded-lg border border-yellow-100 bg-yellow-50 px-4 py-3 text-yellow-800">
+              <p className="font-semibold">Not connected</p>
+              <p>Reconnect Jobber to resume syncing.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
+          >
+            Refresh Data
+          </button>
+          <button
+            onClick={() => (window.location.href = "/jobber")}
+            className="rounded-full bg-[#0A84FF] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#006BE6]"
+          >
+            Reconnect Jobber
+          </button>
+        </div>
+      </section>
+    </main>
   );
 }

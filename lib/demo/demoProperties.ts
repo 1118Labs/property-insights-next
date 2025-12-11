@@ -11,6 +11,7 @@ export type RentcastEnrichment = {
   latitude?: number;
   longitude?: number;
   mapImageUrl?: string | null;
+  raw?: unknown;
 };
 
 export const demoProperties: Record<string, RentcastEnrichment> = {
@@ -26,6 +27,7 @@ export const demoProperties: Record<string, RentcastEnrichment> = {
     estValue: 725000,
     latitude: 41.0642,
     longitude: -72.426,
+    mapImageUrl: "https://maps.example.com/mock/demo1",
   },
   "demo-req-2": {
     provider: "rentcast",
@@ -39,6 +41,7 @@ export const demoProperties: Record<string, RentcastEnrichment> = {
     estValue: 615000,
     latitude: 41.1052,
     longitude: -72.3634,
+    mapImageUrl: "https://maps.example.com/mock/demo2",
   },
   "demo-req-3": {
     provider: "rentcast",
@@ -52,6 +55,7 @@ export const demoProperties: Record<string, RentcastEnrichment> = {
     estValue: 480000,
     latitude: 41.0021,
     longitude: -72.4365,
+    mapImageUrl: "https://maps.example.com/mock/demo3",
   },
   "demo-req-4": {
     provider: "rentcast",
@@ -65,6 +69,7 @@ export const demoProperties: Record<string, RentcastEnrichment> = {
     estValue: 520000,
     latitude: 41.0605,
     longitude: -72.4398,
+    mapImageUrl: "https://maps.example.com/mock/demo4",
   },
   "demo-req-5": {
     provider: "rentcast",
@@ -78,5 +83,6 @@ export const demoProperties: Record<string, RentcastEnrichment> = {
     estValue: 890000,
     latitude: 41.0704,
     longitude: -72.4151,
+    mapImageUrl: "https://maps.example.com/mock/demo5",
   },
 };

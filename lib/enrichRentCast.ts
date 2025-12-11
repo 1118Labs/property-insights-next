@@ -1,3 +1,5 @@
+import { logError, logInfo } from "@/lib/logging";
+
 export type RentcastResponse = {
   beds?: number;
   baths?: number;
@@ -16,7 +18,7 @@ export async function fetchPropertyDetails(
 ): Promise<RentcastResponse | null> {
   const apiKey = process.env.RENTCAST_API_KEY;
   if (!apiKey) {
-    console.error("RENTCAST_API_KEY is not set");
+    logInfo("rentcast.skip", "RENTCAST_API_KEY is not set; skipping lookup.");
     return null;
   }
 
@@ -34,7 +36,10 @@ export async function fetchPropertyDetails(
 
     const text = await res.text();
     if (!res.ok) {
-      console.error("RentCast lookup failed", res.status, text.slice(0, 200));
+      logError("rentcast.error", "RentCast lookup failed", {
+        status: res.status,
+        body: text.slice(0, 200),
+      });
       return null;
     }
 
@@ -42,7 +47,9 @@ export async function fetchPropertyDetails(
     try {
       data = JSON.parse(text);
     } catch (err) {
-      console.error("RentCast response was not JSON", text.slice(0, 200), err);
+      logError("rentcast.error", "RentCast response was not JSON", {
+        body: text.slice(0, 200),
+      });
       return null;
     }
 
@@ -108,7 +115,9 @@ export async function fetchPropertyDetails(
       ),
     };
   } catch (err) {
-    console.error("RentCast lookup error", err);
+    logError("rentcast.exception", "RentCast lookup error", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

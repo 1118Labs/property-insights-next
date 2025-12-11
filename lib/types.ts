@@ -161,6 +161,28 @@ export type PropertyInsight = {
   aerialInsights?: AerialInsight;
 };
 
+export type RentcastEnrichment = {
+  provider: "rentcast";
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  lotSizeSqft?: number;
+  yearBuilt?: number;
+  propertyType?: string;
+  estRent?: number;
+  estValue?: number;
+  latitude?: number;
+  longitude?: number;
+  mapImageUrl?: string | null;
+  raw?: unknown;
+};
+
+export type EnrichmentMeta = {
+  enrichment?: RentcastEnrichment | null;
+  cacheHit?: boolean;
+  fallbackUsed?: boolean;
+};
+
 export type PropertyProfile = {
   property: PropertyRecord;
   client?: ClientRecord | null;

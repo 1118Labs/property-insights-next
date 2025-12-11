@@ -68,3 +68,14 @@ JOBBER_REDIRECT_URI=http://localhost:3000/api/jobber/callback
 ## Notes
 - When Supabase env vars are missing, the app falls back to mock data for insights but Jobber flows require Supabase for token storage.
 - Scoring uses heuristic breakdown (livability, efficiency, market strength, risk) and generates valuations/rent estimates.
+
+## Quick Start for Non-Developers
+1) Install dependencies: `npm install`
+2) Create `.env.local` using the keys listed above (ask the team for values).
+3) Run the app: `npm run dev` and open `http://localhost:3000`.
+4) Smoke test the Jobber → Portal flow:
+   - Visit `/dashboard/jobber` and click **Connect Jobber** (North Fork Maids dev account).
+   - Trigger a sync if available.
+   - Open `/dashboard/requests` to see synced requests.
+   - Click a request to view the property detail.
+   - Generate a portal invite and open the portal URL in an incognito window to view the client experience.

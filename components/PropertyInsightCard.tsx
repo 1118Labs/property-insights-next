@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PropertyProfile } from "@/lib/types";
+import { deriveEnrichedFields, formatAddressDisplay } from "@/lib/propertyDisplay";
 
 type Props = { profile: PropertyProfile; loading?: boolean; variant?: "default" | "compare" };
 
@@ -10,9 +11,6 @@ const fallbackImages = [
   "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=600&q=60",
   "https://images.unsplash.com/photo-1600585154340-0ef3c08f05c7?auto=format&fit=crop&w=600&q=60",
 ];
-
-const formatNumber = (value?: number) =>
-  typeof value === "number" ? value.toLocaleString() : "–";
 
 export function PropertyInsightCard({ profile, loading = false, variant = "default" }: Props) {
   const { property, insights } = profile;
@@ -43,6 +41,8 @@ export function PropertyInsightCard({ profile, loading = false, variant = "defau
 
   const estimatedValue = insights?.valuation?.estimate;
   const summary = insights?.summary || "Property enrichment ready for crews.";
+  const addressLabel = formatAddressDisplay(addr);
+  const { beds, baths, sqft, lot, year, estValue, estRent, hasLimitedData } = deriveEnrichedFields(profile);
 
   return (
     <div className={compact ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"}>
@@ -64,7 +64,7 @@ export function PropertyInsightCard({ profile, loading = false, variant = "defau
             {loading ? (
               <span className="inline-block h-5 w-40 animate-pulse rounded bg-slate-200" />
             ) : (
-              [addr.line1, addr.city].filter(Boolean).join(", ") || "Unknown"
+              addressLabel
             )}
           </h3>
           {property.updatedAt && (
@@ -74,17 +74,17 @@ export function PropertyInsightCard({ profile, loading = false, variant = "defau
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
-        <Stat label="Beds" value={property.beds ?? "-"} loading={loading} />
-        <Stat label="Baths" value={property.baths ?? "-"} loading={loading} />
-        <Stat label="Sqft" value={property.sqft ? property.sqft.toLocaleString() : "-"} loading={loading} />
-        <Stat label="Lot" value={property.lotSizeSqft ? `${formatNumber(property.lotSizeSqft)} sqft` : "-"} loading={loading} />
-        <Stat label="Year" value={property.yearBuilt ?? "-"} loading={loading} />
-        <Stat
-          label="Estimated value"
-          value={estimatedValue ? `$${formatNumber(Math.round(estimatedValue))}` : "–"}
-          loading={loading}
-        />
+        <Stat label="Beds" value={beds} loading={loading} />
+        <Stat label="Baths" value={baths} loading={loading} />
+        <Stat label="Sqft" value={sqft} loading={loading} />
+        <Stat label="Lot" value={lot} loading={loading} />
+        <Stat label="Year" value={year} loading={loading} />
+        <Stat label="Estimated value" value={estValue} loading={loading} />
+        <Stat label="Estimated rent" value={estRent} loading={loading} />
       </div>
+      {hasLimitedData && (
+        <p className="text-xs text-slate-500">Limited data — estimate only.</p>
+      )}
 
       <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
         <p className="font-semibold text-slate-900">Property notes</p>

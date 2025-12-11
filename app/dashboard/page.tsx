@@ -1,36 +1,50 @@
 "use client";
 
-import OverviewCards from "@/components/dashboard/OverviewCards";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import Sidebar from "@/components/dashboard/Sidebar";
 import TopBar from "@/components/dashboard/TopBar";
+import DashboardStats from "@/components/dashboard/DashboardStats";
+import SectionHeader from "@/components/dashboard/SectionHeader";
+import ReportCard from "@/components/dashboard/ReportCard";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
 import { isAuthEnabled } from "@/lib/featureFlags";
 import Hint from "@/components/onboarding/Hint";
-import {
-  isOnboardingHintsEnabled,
-  isDemoModeEnabled,
-} from "@/lib/featureFlags";
+import { isOnboardingHintsEnabled, isDemoModeEnabled } from "@/lib/featureFlags";
 import PIButton from "@/components/ui/PIButton";
 import PICard from "@/components/ui/PICard";
+import {
+  ChartPieIcon,
+  ClipboardDocumentCheckIcon,
+  HeartIcon,
+  ShieldCheckIcon,
+  SignalIcon,
+} from "@heroicons/react/24/outline";
 
 const stats = [
   {
-    label: "Today's Jobs Count",
-    value: "24",
-    helper: "8 in progress, 16 scheduled",
+    label: "Total Properties",
+    value: "742",
+    helper: "12 added this week",
   },
   {
-    label: "Total Clients Count",
+    label: "Total Requests",
     value: "312",
     helper: "5 new this week",
   },
   {
-    label: "Total Properties Count",
-    value: "742",
-    helper: "12 added in the last 7 days",
+    label: "Completed Jobs",
+    value: "186",
+    helper: "Last 30 days",
+  },
+  {
+    label: "Active Quotes",
+    value: "42",
+    helper: "Awaiting approval",
+  },
+  {
+    label: "Sync Status",
+    value: "Healthy",
+    helper: "Jobber connected",
   },
 ];
 
@@ -118,16 +132,58 @@ export default function DashboardPage() {
     );
   }
 
+  const reports = [
+    {
+      title: "Property Health Report",
+      description: "See quality, valuation, and risk signals across your portfolio.",
+      href: "/admin/property-health",
+      icon: HeartIcon,
+    },
+    {
+      title: "Provider Health Diagnostics",
+      description: "Monitor provider reliability and upstream circuit status.",
+      href: "/admin/providers",
+      icon: ShieldCheckIcon,
+    },
+    {
+      title: "Enrichment Log",
+      description: "Review enrichment runs, source quality, and fallbacks.",
+      href: "/admin/enrichment-log",
+      icon: ClipboardDocumentCheckIcon,
+    },
+    {
+      title: "Usage & API Metrics",
+      description: "Track volume, performance, and consumption trends.",
+      href: "/admin/status",
+      icon: SignalIcon,
+    },
+    {
+      title: "System Health",
+      description: "Check platform status, uptime, and recent issues.",
+      href: "/admin/system-health",
+      icon: ChartPieIcon,
+    },
+  ];
+
   return (
-    <div className="relative min-h-screen bg-[#F5F5F7] text-[#0B1220]">
+    <div className="relative min-h-screen bg-gradient-to-b from-white via-slate-50 to-white text-[#0B1220]">
       <div className="relative flex">
         <Sidebar />
 
         <main className="flex-1">
           <TopBar userName="Ops Team" lastSync="Last sync just now" showJobberStatus />
 
-          <div className="mx-auto max-w-7xl space-y-8 px-6 py-10 md:px-10">
-            <Image src="/brand/pi-logo.png" alt="Property Insights" width={120} height={48} className="h-8 w-auto opacity-90" />
+          <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+            <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white px-6 py-6 sm:px-10 sm:py-8 shadow-sm">
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(52,120,246,0.06),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(16,185,129,0.06),transparent_30%)]" />
+              </div>
+              <div className="relative space-y-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
+                <p className="text-sm text-gray-600">Your workspace overview</p>
+              </div>
+            </section>
+
             {hintsEnabled && (
               <Hint
                 title="Start by connecting Jobber"
@@ -146,63 +202,23 @@ export default function DashboardPage() {
               />
             )}
 
-            <OverviewCards stats={stats} />
+            <div className="space-y-4">
+              <SectionHeader title="Stats" subtitle="Key signals across your workspace" />
+              <DashboardStats stats={stats} />
+            </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <PICard className="overflow-hidden rounded-[20px]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280]">
-                      Jobber Requests
-                    </div>
-                    <div className="text-xl font-semibold text-[#021C36]">
-                      Field status at a glance
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              <SectionHeader title="Reports" subtitle="Deep dives for health, usage, and quality" />
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {reports.map((report) => (
+                  <ReportCard key={report.title} {...report} />
+                ))}
+              </div>
+            </div>
 
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#021C36] ring-1 ring-[#E3E4EA]">
-                    Live sync
-                  </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <PICard className="rounded-[16px] border px-4 py-3 shadow-sm">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B7280]">
-                      In Progress
-                    </div>
-                    <div className="text-2xl font-bold text-[#021C36]">
-                      8 jobs
-                    </div>
-                    <div className="text-sm text-[#6B7280]">3 crews on route</div>
-                  </PICard>
-
-                  <PICard className="rounded-[16px] border px-4 py-3 shadow-sm">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B7280]">
-                      Scheduled
-                    </div>
-                    <div className="text-2xl font-bold text-[#021C36]">
-                      16 jobs
-                    </div>
-                    <div className="text-sm text-[#6B7280]">
-                      All clients confirmed
-                    </div>
-                  </PICard>
-
-                  <PICard className="rounded-[16px] border px-4 py-3 shadow-sm">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B7280]">
-                      Issues
-                    </div>
-                    <div className="text-2xl font-bold text-[#021C36]">
-                      2 holds
-                    </div>
-                    <div className="text-sm text-[#6B7280]">
-                      Weather delay flagged
-                    </div>
-                  </PICard>
-                </div>
-              </PICard>
-
-              <PICard className="rounded-[20px]">
+            <div className="space-y-4">
+              <SectionHeader title="Recent Activity" subtitle="Latest events across requests and insights" />
+              <PICard>
                 <RecentActivity items={activityItems} />
               </PICard>
             </div>

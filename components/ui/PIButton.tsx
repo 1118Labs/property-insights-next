@@ -19,11 +19,11 @@ type PIButtonProps = LinkButtonProps | NativeButtonProps;
 
 const variantClasses: Record<NonNullable<PIButtonProps["variant"]>, string> = {
   primary:
-    "rounded-lg bg-[#0A84FF] text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-[#006BE6] transition disabled:opacity-60 disabled:cursor-not-allowed",
+    "rounded-full bg-[#0A84FF] text-white px-5 py-3 text-sm font-semibold shadow-sm shadow-slate-200 hover:bg-[#006BE6] transition-all duration-200 ease-out disabled:opacity-60 disabled:cursor-not-allowed",
   secondary:
-    "rounded-lg border border-slate-300 bg-white text-slate-800 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition disabled:opacity-60 disabled:cursor-not-allowed",
+    "rounded-full border border-gray-300 bg-white text-gray-800 px-5 py-3 text-sm font-semibold shadow-sm shadow-slate-100 hover:bg-gray-50 transition-all duration-200 ease-out disabled:opacity-60 disabled:cursor-not-allowed",
   tertiary:
-    "rounded-lg text-slate-500 hover:text-slate-700 text-sm underline-offset-2 hover:underline transition px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed",
+    "rounded-full text-gray-600 hover:text-gray-800 text-sm underline-offset-2 hover:underline transition-all duration-200 ease-out px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed",
 };
 
 function isLinkButtonProps(props: PIButtonProps): props is LinkButtonProps {

@@ -202,8 +202,8 @@ export default function RequestsDashboardPage() {
 
   const errorMessage = missingToken
     ? "Jobber is not connected. Connect to start syncing requests."
-    : error instanceof Error
-    ? error.message
+    : isRequestsApiError(error) && (error.message || error.error)
+    ? error.message || error.error || "Something went wrong."
     : "Something went wrong.";
 
   return (

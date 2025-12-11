@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { ClientPortalLayout } from "@/components/ClientPortalLayout";
 import ClientInsightCard from "@/components/ClientInsightCard";
 import { PropertyProfile } from "@/lib/types";
+import { PortalHero } from "@/components/portal/PortalHero";
+import { formatAddress } from "@/lib/utils/address";
 
 async function fetchSession(token: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/portal/verify?token=${token}`, { cache: "no-store" });
@@ -22,9 +24,11 @@ export default async function PortalInsightsPage({ params }: { params: { token: 
   const session = sessionRes.data;
   const profile = await fetchProfile(session.propertyId);
   if (!profile) return notFound();
+  const address = formatAddress(profile.property.address);
 
   return (
     <ClientPortalLayout>
+      <PortalHero title="Your Property Insights" subtitle={`Confidential link for: ${address}`} />
       <ClientInsightCard profile={profile} />
     </ClientPortalLayout>
   );

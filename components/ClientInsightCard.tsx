@@ -1,5 +1,5 @@
-import { formatAddress } from "@/lib/utils/address";
 import { PropertyProfile } from "@/lib/types";
+import { deriveEnrichedFields, formatAddressDisplay } from "@/lib/propertyDisplay";
 
 type StatProps = {
   label: string;
@@ -21,25 +21,29 @@ function Stat({ label, value }: StatProps) {
 
 export default function ClientInsightCard({ profile }: { profile: PropertyProfile }) {
   const property = profile.property;
-
-  const beds = property.beds != null ? String(property.beds) : "–";
-  const baths = property.baths != null ? String(property.baths) : "–";
-  const sqft = typeof property.sqft === "number" ? property.sqft.toLocaleString() : "–";
-  const year = property.yearBuilt != null ? String(property.yearBuilt) : "–";
-  const address = property.address ? formatAddress(property.address) : "–";
+  const address = formatAddressDisplay(property.address);
+  const { beds, baths, sqft, lot, year, estValue, estRent, hasLimitedData } = deriveEnrichedFields(profile);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="text-lg font-semibold text-slate-900 dark:text-white">
-        {address}
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md">
+      <div className="h-36 w-full rounded-lg bg-gradient-to-br from-gray-50 to-white ring-1 ring-gray-100 shadow-inner" />
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-gray-900">{address}</p>
+        <p className="text-xs text-gray-500">Confidential property snapshot</p>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700 dark:text-slate-200 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 text-sm text-gray-700 sm:grid-cols-4">
         <Stat label="Beds" value={beds} />
         <Stat label="Baths" value={baths} />
         <Stat label="Sqft" value={sqft} />
         <Stat label="Year" value={year} />
+        <Stat label="Lot Size" value={lot} />
+        <Stat label="Est. Value" value={estValue} />
+        <Stat label="Est. Rent" value={estRent} />
       </div>
+      {hasLimitedData && (
+        <p className="text-xs text-gray-500">Limited data — estimate only.</p>
+      )}
     </div>
   );
 }

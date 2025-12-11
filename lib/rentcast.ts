@@ -2,19 +2,8 @@
 //
 // Lightweight RentCast helper to enrich property details defensively.
 
-export type RentcastPropertyInsight = {
-  beds?: number;
-  baths?: number;
-  sqft?: number;
-  lotSizeSqft?: number;
-  yearBuilt?: number;
-  propertyType?: string;
-  estRent?: number;
-  estValue?: number;
-  latitude?: number;
-  longitude?: number;
-  raw?: unknown;
-};
+import { logError, logInfo } from "@/lib/logging";
+import { RentcastEnrichment } from "@/lib/types";
 
 type RentcastAddressInput = {
   line1: string;
@@ -44,9 +33,10 @@ function pickString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function mapRentcastPayload(payload: unknown): RentcastPropertyInsight {
+function mapRentcastPayload(payload: unknown): RentcastEnrichment {
+  const base: RentcastEnrichment = { provider: "rentcast" };
   const source = asRecord(payload);
-  if (!source) return {};
+  if (!source) return base;
 
   const property = asRecord(source.property);
   const buildingArea = asRecord(property?.buildingArea);
@@ -131,6 +121,7 @@ function mapRentcastPayload(payload: unknown): RentcastPropertyInsight {
   );
 
   return {
+    provider: "rentcast",
     beds,
     baths,
     sqft,
@@ -146,16 +137,19 @@ function mapRentcastPayload(payload: unknown): RentcastPropertyInsight {
 }
 
 export async function fetchRentcastInsight(
-  address: RentcastAddressInput
-): Promise<RentcastPropertyInsight | null> {
+  address: RentcastAddressInput,
+  timeoutMs = 8000
+): Promise<RentcastEnrichment | null> {
   const apiKey = process.env.RENTCAST_API_KEY;
 
   if (!apiKey) {
-    console.warn("RENTCAST_API_KEY is not set; skipping RentCast enrichment.");
+    logInfo("rentcast.skip", "API key missing; skipping RentCast enrichment.");
     return null;
   }
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const url = new URL("https://api.rentcast.io/v1/properties/address");
     url.searchParams.set("address", address.line1);
     url.searchParams.set("city", address.city);
@@ -169,12 +163,17 @@ export async function fetchRentcastInsight(
         "X-Api-Key": apiKey,
       },
       cache: "no-store",
+      signal: controller.signal,
     });
+    clearTimeout(timer);
 
     const text = await res.text();
 
     if (!res.ok) {
-      console.error("RentCast lookup failed", res.status, text.slice(0, 200));
+      logError("rentcast.error", "RentCast lookup failed", {
+        status: res.status,
+        body: text.slice(0, 200),
+      });
       return null;
     }
 
@@ -182,19 +181,23 @@ export async function fetchRentcastInsight(
     try {
       data = JSON.parse(text);
     } catch (err) {
-      console.error("RentCast response was not JSON", text.slice(0, 200), err);
+      logError("rentcast.error", "RentCast response was not JSON", {
+        body: text.slice(0, 200),
+      });
       return null;
     }
 
     const payload = Array.isArray(data) ? data[0] : data;
     if (!payload) {
-      console.warn("RentCast returned empty payload for address", address);
+      logInfo("rentcast.empty", "RentCast returned empty payload", { address });
       return null;
     }
 
     return mapRentcastPayload(payload);
   } catch (err) {
-    console.error("RentCast lookup error", err);
+    logError("rentcast.exception", "RentCast lookup error", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

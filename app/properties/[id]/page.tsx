@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PhotoPlaceholder } from "@/components/PhotoPlaceholder";
-import { PropertyHeader } from "@/components/property/PropertyHeader";
-import { PropertySpecs } from "@/components/property/PropertySpecs";
-import { PropertyMap } from "@/components/property/PropertyMap";
 import { getMapSnapshot } from "@/lib/appleMaps";
 import { PropertyProfile } from "@/lib/types";
+import { PropertyHeader } from "@/components/properties/PropertyHeader";
+import { PropertyStats } from "@/components/properties/PropertyStats";
+import { MapPanel } from "@/components/properties/MapPanel";
+import { EnrichmentProvenance } from "@/components/properties/EnrichmentProvenance";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 async function fetchProfile(id: string): Promise<PropertyProfile | null> {
   const base = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -64,46 +66,35 @@ export default async function PropertyDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 px-5 py-10 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white px-4 py-10 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <PropertyHeader property={profile.property} />
+
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <PropertyHeader
-            addressLine={addressLine}
-            subtitle="Specs, map preview, and estimated value."
-          />
-          <div className="flex gap-2">
+          <SectionHeader title="Overview" subtitle="Specs, map preview, and provenance" />
+          <div className="flex flex-wrap gap-2">
             <Link
               href="/properties"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
             >
               ← Back
             </Link>
             <a
               href="/api/export/properties.csv"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
             >
               Export CSV
             </a>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-4">
-            <PropertySpecs
-              beds={profile.property.beds ?? undefined}
-              baths={profile.property.baths ?? undefined}
-              sqft={profile.property.sqft ?? undefined}
-              lotSize={profile.property.lotSizeSqft ?? undefined}
-              yearBuilt={profile.property.yearBuilt ?? undefined}
-              estimatedValue={estimatedValue}
-            />
-          </div>
+        <PropertyStats profile={profile} />
 
-          <div className="space-y-4">
-            <PropertyMap mapImageUrl={mapImageUrl || undefined} lat={lat} lng={lng} />
-            <PhotoPlaceholder />
-          </div>
-        </div>
+        <MapPanel latitude={lat} longitude={lng} mapImageUrl={mapImageUrl} />
+
+        <EnrichmentProvenance enrichment={profile.enrichment} property={profile.property} />
+
+        <PhotoPlaceholder />
       </div>
     </div>
   );

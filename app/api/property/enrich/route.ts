@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchPropertyDetails } from "@/lib/enrichRentCast";
 import { fetchZillowProperty } from "@/lib/zillow";
 import { getMapSnapshot } from "@/lib/appleMaps";
+import { logError, logInfo } from "@/lib/logging";
 
 type EnrichResponse = {
   addressNormalized: string;
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
           ? await getMapSnapshot(rentcast.latitude, rentcast.longitude)
           : null;
 
+      logInfo("property.enrich", "RentCast enrichment successful", { provider: "rentcast" });
       return NextResponse.json({
         addressNormalized: address,
         beds: rentcast.beds,
@@ -63,6 +65,7 @@ export async function POST(req: Request) {
     });
 
     if (zillow) {
+      logInfo("property.enrich", "Zillow enrichment fallback", { provider: "zillow" });
       return NextResponse.json({
         addressNormalized: address,
         beds: undefined,
@@ -87,6 +90,9 @@ export async function POST(req: Request) {
       provider: "fallback",
     } satisfies EnrichResponse);
   } catch (err) {
+    logError("property.enrich.error", "Property enrichment failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { error: "server_error", message: err instanceof Error ? err.message : "Unknown" },
       { status: 500 }

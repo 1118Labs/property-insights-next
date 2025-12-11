@@ -20,6 +20,30 @@ const DEFAULT_JOBBER_AUTH_URL =
 const DEFAULT_JOBBER_TOKEN_URL =
   "https://api.getjobber.com/api/oauth/token";
 
+function formatJobberGraphqlError(status: number, raw: string) {
+  let detail: string | undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.errors) && parsed.errors.length) {
+      detail =
+        parsed.errors[0]?.message ||
+        (typeof parsed.errors[0] === "string"
+          ? parsed.errors[0]
+          : undefined);
+    } else if (parsed?.error) {
+      detail = parsed.error;
+    }
+  } catch {
+    // swallow parse errors and fall back to raw text
+  }
+
+  const snippet = (detail || raw || "")
+    .toString()
+    .replace(/\s+/g, " ")
+    .slice(0, 200);
+  return `Jobber GraphQL error (${status}): ${snippet || "unknown error"}`;
+}
+
 // -------------------------------------------
 // Base URL Resolution (Netlify / Vercel Safe)
 // -------------------------------------------
@@ -262,7 +286,22 @@ export async function fetchJobberBusinessId(accessToken: string) {
     }),
   });
 
-  const json = await res.json();
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(formatJobberGraphqlError(res.status, raw));
+  }
+
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new Error(formatJobberGraphqlError(res.status, raw));
+  }
+
+  if (json?.errors) {
+    throw new Error(formatJobberGraphqlError(res.status, raw));
+  }
+
   return json?.data?.viewer?.business?.id ?? null;
 }
 
@@ -405,9 +444,27 @@ export async function fetchRecentJobberRequests(
   });
 
   const raw = await res.text();
-  if (!res.ok) throw new Error(`Jobber GraphQL failed: ${raw}`);
+  if (!res.ok) {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
 
-  const json = JSON.parse(raw);
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
+
+  if (json?.errors) {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
+
   return (json?.data?.requests?.edges ?? []).filter(
     (e: any) => e?.node?.id
   );
@@ -445,8 +502,28 @@ export async function fetchJobberClient(
   });
 
   const raw = await res.text();
-  if (!res.ok) throw new Error(`Jobber client fetch failed: ${raw}`);
-  return JSON.parse(raw);
+  if (!res.ok) {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
+
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
+
+  if (json?.errors) {
+    const error = new Error(formatJobberGraphqlError(res.status, raw));
+    (error as any).status = res.status;
+    throw error;
+  }
+
+  return json;
 }
 
 // -------------------------------------------
