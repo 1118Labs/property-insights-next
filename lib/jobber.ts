@@ -20,6 +20,36 @@ const DEFAULT_JOBBER_AUTH_URL =
 const DEFAULT_JOBBER_TOKEN_URL =
   "https://api.getjobber.com/api/oauth/token";
 
+export const JOBBER_GRAPHQL_API_VERSION =
+  process.env.JOBBER_GRAPHQL_API_VERSION?.trim() || "2023-11-15";
+
+let jobberVersionWarned = false;
+function getJobberGraphqlHeaders(accessToken: string): Record<string, string> {
+  if (!process.env.JOBBER_GRAPHQL_API_VERSION && !jobberVersionWarned) {
+    console.warn(
+      "JOBBER_GRAPHQL_API_VERSION not set; using default 2023-11-15"
+    );
+    jobberVersionWarned = true;
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "X-Jobber-Graphql-Version": JOBBER_GRAPHQL_API_VERSION,
+  };
+}
+
+async function postJobberGraphql(
+  accessToken: string,
+  payload: Record<string, unknown>
+) {
+  return fetch(JOBBER_GRAPHQL_URL, {
+    method: "POST",
+    headers: getJobberGraphqlHeaders(accessToken),
+    body: JSON.stringify(payload),
+  });
+}
+
 function formatJobberGraphqlError(status: number, raw: string) {
   let detail: string | undefined;
   try {
@@ -275,15 +305,8 @@ export async function refreshJobberToken(refreshToken: string) {
 // Fetch Business ID
 // -------------------------------------------
 export async function fetchJobberBusinessId(accessToken: string) {
-  const res = await fetch(JOBBER_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: `query { viewer { business { id } } }`,
-    }),
+  const res = await postJobberGraphql(accessToken, {
+    query: `query { viewer { business { id } } }`,
   });
 
   const raw = await res.text();
@@ -434,13 +457,9 @@ export async function fetchRecentJobberRequests(
     }
   `;
 
-  const res = await fetch(JOBBER_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query, variables: { first: limit } }),
+  const res = await postJobberGraphql(accessToken, {
+    query,
+    variables: { first: limit },
   });
 
   const raw = await res.text();
@@ -492,13 +511,9 @@ export async function fetchJobberClient(
     }
   `;
 
-  const res = await fetch(JOBBER_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query, variables: { id: clientId } }),
+  const res = await postJobberGraphql(accessToken, {
+    query,
+    variables: { id: clientId },
   });
 
   const raw = await res.text();

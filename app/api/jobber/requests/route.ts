@@ -11,6 +11,7 @@ import { demoProperties } from "@/lib/demo/demoProperties";
 import { demoRequests } from "@/lib/demo/demoRequests";
 import { normalizeAddress, formatAddress } from "@/lib/utils/address";
 import { requireAdminClient, supabaseEnabled } from "@/lib/supabase/server";
+import { JOBBER_GRAPHQL_API_VERSION } from "@/lib/jobber";
 
 export type RequestAddress = {
   line1?: string;
@@ -198,7 +199,7 @@ async function fetchJobberRequestsNormalized(accessToken: string, jobberAccountI
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
-      "X-JOBBER-GRAPHQL-VERSION": process.env.JOBBER_GRAPHQL_VERSION || "2023-11-15",
+      "X-Jobber-Graphql-Version": JOBBER_GRAPHQL_API_VERSION,
     },
     body: JSON.stringify({
       query,
